@@ -4,7 +4,7 @@ from dash import html
 import os
 import pydeck as pdk
 from utils.geo_utils import geoencode_address, calculate_isochrones, partition_drivers_by_isochrones, extract_coords_from_encompassing_isochrone, check_partitions_intersection
-from db.db_support import fetch_drivers, fetch_shifts
+from db.db_support import fetch_drivers, fetch_shifts, fetch_managers
 from dash.dependencies import Input, Output, State
 from dash import dcc
 from dash import dash_table, dcc, html
@@ -37,12 +37,18 @@ app.layout = html.Div([
             step=5,
             value=[5, 10],
             marks={i: f'{i}' for i in range(5, 61, 5)},
-            # style={'marginBottom': '10px'}
         ),
         dcc.Dropdown(
             id='shifts-dropdown',
             options=[{'label': shift['name'], 'value': shift['name']} for shift in fetch_shifts().to_dict('records')],
             placeholder='Select a shift',
+            multi=True,
+            style={'marginBottom': '10px'}
+        ),
+        dcc.Dropdown(  # Dropdown for managers
+            id='managers-dropdown',
+            options=[{'label': manager['name'], 'value': manager['name']} for manager in fetch_managers().to_dict('records')],
+            placeholder='Select a manager',
             multi=True,
             style={'marginBottom': '10px'}
         ),
@@ -90,18 +96,18 @@ app.layout = html.Div([
             ], 
             type="circle"
         ),
-    ], style={'width': '100%', 'position': 'relative', 'marginTop': '20px'}),  # Adjust marginTop as needed
+    ], style={'width': '80%', 'position': 'relative', 'marginTop': '20px'}),  # Adjust marginTop as needed
     html.Div(id='data-tables-container', children=[])  # Container for dynamic data tables
 ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
 
 @app.callback(
     [Output('map', 'data'), Output('data-tables-container', 'children'), Output('alert-fail-geoencode', 'is_open')],
-    [Input('submit-val', 'n_clicks'), Input('shifts-dropdown', 'value')],
+    [Input('submit-val', 'n_clicks'), Input('shifts-dropdown', 'value'), Input('managers-dropdown', 'value')],
     [State('street-input', 'value'),
      State('zip-code-input', 'value'),
      State('time-limit-range-slider', 'value')]
 )
-def update_map_and_tables(n_clicks, selected_shifts, street, zip_code, time_limits):
+def update_map_and_tables(n_clicks, selected_shifts, selected_managers, street, zip_code, time_limits):
     if n_clicks > 0:
         geoencode_result = geoencode_address(street, zip_code)
         
@@ -120,6 +126,10 @@ def update_map_and_tables(n_clicks, selected_shifts, street, zip_code, time_limi
             if selected_shifts:
                 drivers_list = [driver for driver in drivers_list if driver['shift'] in selected_shifts]
                 drivers_gdf = drivers_gdf[drivers_gdf['shift'].isin(selected_shifts)]
+            
+            if selected_managers:
+                drivers_list = [driver for driver in drivers_list if driver['manager'] in selected_managers]
+                drivers_gdf = drivers_gdf[drivers_gdf['manager'].isin(selected_managers)]
 
             # Define icon data
             icon_data = {

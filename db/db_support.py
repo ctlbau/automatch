@@ -5,6 +5,15 @@ import json
 import pandas as pd
 import geopandas as gpd
 
+def fetch_managers():
+    with connect(localauth) as local_conn:
+        with local_conn.cursor() as local_cursor:
+            local_cursor.execute("""SELECT id, name FROM Managers;""")
+            managers = local_cursor.fetchall()
+            columns = [desc[0] for desc in local_cursor.description]
+            managers = pd.DataFrame(managers, columns=columns)
+    return managers
+
 def fetch_shifts():
     with connect(localauth) as local_conn:
         with local_conn.cursor() as local_cursor:
