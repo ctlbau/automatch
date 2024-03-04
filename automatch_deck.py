@@ -24,10 +24,12 @@ CHOSEN_STYLE = MAP_STYLES[0]
 app.layout = html.Div([
     # Container for inputs and button
     html.Div([
-        dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True),
-        dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False),
-        html.Button('Submit', id='submit-val', n_clicks=0),
-        html.Label('Isochrone Limits (in minutes):'),
+        dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, style={'marginRight': '10px', 'width': '350px', 'display': 'block', 'marginBottom': '10px'}),
+        html.Div([  # New div to wrap zip-code-input and Submit button
+            dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False, style={'marginRight': '10px', 'display': 'inline-block', 'marginBottom': '10px'}),
+            html.Button('Submit', id='submit-val', n_clicks=0, style={'display': 'inline-block'}),
+        ], style={'display': 'flex', 'flexDirection': 'row'}),  # This ensures horizontal alignment
+        html.Label('Isochrone Limits (in minutes):', style={'display': 'block', 'marginBottom': '10px'}),
         dcc.RangeSlider(
             id='time-limit-range-slider',
             min=5,
@@ -35,13 +37,15 @@ app.layout = html.Div([
             step=5,
             value=[5, 10],
             marks={i: f'{i}' for i in range(5, 61, 5)},
+            # style={'marginBottom': '10px'}
         ),
         dcc.Dropdown(
             id='shifts-dropdown',
             options=[{'label': shift['name'], 'value': shift['name']} for shift in fetch_shifts().to_dict('records')],
             placeholder='Select a shift',
-            multi=True
-            ),
+            multi=True,
+            style={'marginBottom': '10px'}
+        ),
     ], style={'padding': '20px', 'maxWidth': '600px'}),
     
     # Alert for failed geoencoding
