@@ -28,7 +28,7 @@ app.layout = html.Div([
         html.Div([  # New div to wrap zip-code-input and Submit button
             dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False, style={'marginRight': '10px', 'display': 'inline-block', 'marginBottom': '10px'}),
             html.Button('Submit', id='submit-val', n_clicks=0, style={'display': 'inline-block'}),
-        ], style={'display': 'flex', 'flexDirection': 'row'}),  # This ensures horizontal alignment
+        ], style={'display': 'flex', 'flexDirection': 'row'}),
         html.Label('Isochrone Limits (in minutes):', style={'display': 'block', 'marginBottom': '10px'}),
         dcc.RangeSlider(
             id='time-limit-range-slider',
@@ -205,6 +205,7 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, street, 
                     title = f'{number_of_drivers} drivers within {iso_title} minutes of chosen location'
                 else:
                     # This is the last partition, so we give it a custom title
+                    number_of_drivers = len(partition)
                     title = f'{number_of_drivers} drivers outside largest isochrone'
                 data_tables.append(html.Div(children=[html.H3(title), table], style={'margin': '20px'}))
 
