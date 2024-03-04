@@ -190,11 +190,12 @@ def update_map_and_tables(n_clicks, selected_shifts, street, zip_code, time_limi
                     style_cell={'textAlign': 'left'},
                 )
                 if i < num_partitions - 1:
+                    number_of_drivers = len(partition)
                     iso_title = time_limits[0] + i * 5
-                    title = f'Drivers within {iso_title} minutes of chosen location'
+                    title = f'{number_of_drivers} drivers within {iso_title} minutes of chosen location'
                 else:
                     # This is the last partition, so we give it a custom title
-                    title = 'Drivers outside largest isochrone'
+                    title = f'{number_of_drivers} drivers outside largest isochrone'
                 data_tables.append(html.Div(children=[html.H3(title), table], style={'margin': '20px'}))
 
             return new_deck_data, data_tables, False
