@@ -4,7 +4,7 @@ from dash import html
 import os
 import pydeck as pdk
 from utils.geo_utils import geoencode_address, calculate_isochrones, partition_drivers_by_isochrones, extract_coords_from_encompassing_isochrone, check_partitions_intersection
-from db.db_support import fetch_drivers
+from db.db_support import fetch_drivers, fetch_shifts
 from dash.dependencies import Input, Output, State
 from dash import dcc
 from dash import dash_table, dcc, html
@@ -36,6 +36,12 @@ app.layout = html.Div([
             value=[5, 10],
             marks={i: f'{i}' for i in range(5, 61, 5)},
         ),
+        dcc.Dropdown(
+            id='shifts-dropdown',
+            options=[{'label': shift['name'], 'value': shift['name']} for shift in fetch_shifts().to_dict('records')],
+            placeholder='Select a shift',
+            multi=True
+            ),
     ], style={'padding': '20px', 'maxWidth': '600px'}),
     
     # Alert for failed geoencoding
@@ -84,15 +90,14 @@ app.layout = html.Div([
     html.Div(id='data-tables-container', children=[])  # Container for dynamic data tables
 ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
 
-
 @app.callback(
     [Output('map', 'data'), Output('data-tables-container', 'children'), Output('alert-fail-geoencode', 'is_open')],
-    [Input('submit-val', 'n_clicks')],
+    [Input('submit-val', 'n_clicks'), Input('shifts-dropdown', 'value')],
     [State('street-input', 'value'),
      State('zip-code-input', 'value'),
      State('time-limit-range-slider', 'value')]
 )
-def update_map_and_tables(n_clicks, street, zip_code, time_limits):
+def update_map_and_tables(n_clicks, selected_shifts, street, zip_code, time_limits):
     if n_clicks > 0:
         geoencode_result = geoencode_address(street, zip_code)
         
@@ -108,10 +113,13 @@ def update_map_and_tables(n_clicks, street, zip_code, time_limits):
             isochrone_coords = extract_coords_from_encompassing_isochrone(isochrones_geojson)
             computed_view_state = pdk.data_utils.compute_view(isochrone_coords, view_proportion=0.9)
             drivers_df, drivers_gdf, drivers_list = fetch_drivers()
+            if selected_shifts:
+                drivers_list = [driver for driver in drivers_list if driver['shift'] in selected_shifts]
+                drivers_gdf = drivers_gdf[drivers_gdf['shift'].isin(selected_shifts)]
 
             # Define icon data
             icon_data = {
-                "url": "https://upload.wikimedia.org/wikipedia/commons/3/3b/Blackicon.png",  # Example icon
+                "url": "https://upload.wikimedia.org/wikipedia/commons/3/3b/Blackicon.png",
                 "width": 100,
                 "height": 100,
                 # "anchorY": 242,

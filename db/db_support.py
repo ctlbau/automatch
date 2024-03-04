@@ -5,6 +5,15 @@ import json
 import pandas as pd
 import geopandas as gpd
 
+def fetch_shifts():
+    with connect(localauth) as local_conn:
+        with local_conn.cursor() as local_cursor:
+            local_cursor.execute("""SELECT id, name FROM Shifts;""")
+            shifts = local_cursor.fetchall()
+            columns = [desc[0] for desc in local_cursor.description]
+            shifts = pd.DataFrame(shifts, columns=columns)
+    return shifts
+
 def fetch_drivers_geojson():
     with connect(localauth) as local_conn:
         with local_conn.cursor() as local_cursor:
