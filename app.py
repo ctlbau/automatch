@@ -4,7 +4,6 @@ from dash import dcc, html
 from dash.dependencies import Input, Output
 
 # Import your page layouts and callbacks
-from pages import deck_page, match_page
 
 # Choose a theme from https://bootswatch.com/ or use the default Bootstrap theme
 app = dash.Dash(
@@ -14,21 +13,18 @@ app = dash.Dash(
     suppress_callback_exceptions=True
                 )
 
-app.layout = html.Div([
-    dcc.Location(id='url', refresh=False),
-    dcc.Store(id='drivers-to-match-store'),  # Store here to share data between pages
-    html.Div(id='page-content')
-])
+from pages import deck_page, match_page # Import the pages after app instatiation
 
-@app.callback(Output('page-content', 'children'),
-              [Input('url', 'pathname')])
-def display_page(pathname):
-    if pathname == '/deck_page':
-        return deck_page.layout
-    elif pathname == '/match_page':
-        return match_page.layout
-    else:
-        return '404'
+app.layout = html.Div([
+    dcc.Store(id='drivers-to-match-store'),  # Store here to share data between pages
+        html.H1('AutoMatch'),
+    html.Div([
+        html.Div(
+            dcc.Link(f"{page['name']} - {page['path']}", href=page["relative_path"])
+        ) for page in dash.page_registry.values()
+    ]),
+    dash.page_container
+])
 
 if __name__ == '__main__':
     app.run_server(debug=True)

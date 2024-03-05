@@ -11,6 +11,7 @@ from dash import dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
 
+dash.register_page(__name__)
 
 BASE_URL = "http://localhost:8989/isochrone"
 

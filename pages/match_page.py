@@ -3,6 +3,7 @@ from dash import html, callback, Input, Output, State, callback_context
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
 
+dash.register_page(__name__)
 
 # Example data structure
 candidates = [
