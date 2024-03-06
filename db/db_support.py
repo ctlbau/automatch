@@ -5,6 +5,63 @@ import json
 import pandas as pd
 import geopandas as gpd
 
+def fetch_drivers_matches(driver_ids):
+    with connect(localauth) as local_conn:
+        with local_conn.cursor() as local_cursor:
+            local_cursor.execute("""
+                SELECT DISTINCT
+                    d1.kendra_id AS candidate_id,
+                    d1.name AS candidate_name,
+                    s1.name AS candidate_shift,  # Assuming the candidate's shift name is also in the Shifts table
+                    m1.name AS candidate_manager,  # Assuming the candidate's manager name is also in the Managers table
+                    d2.kendra_id AS matched_driver_id,
+                    d2.name AS matched_driver_name,
+                    s2.name AS matched_driver_shift,
+                    m2.name AS matched_driver_manager
+                FROM
+                    DriversVehicles dv1
+                    JOIN DriversVehicles dv2 ON dv1.vehicle_id = dv2.vehicle_id
+                        AND dv1.driver_id != dv2.driver_id
+                    JOIN Drivers d1 ON dv1.driver_id = d1.kendra_id
+                    JOIN Drivers d2 ON dv2.driver_id = d2.kendra_id
+                    LEFT JOIN Shifts s1 ON d1.shift_id = s1.id  # Candidate's shift
+                    LEFT JOIN Managers m1 ON d1.manager_id = m1.id  # Candidate's manager
+                    LEFT JOIN Shifts s2 ON d2.shift_id = s2.id  # Matched driver's shift
+                    LEFT JOIN Managers m2 ON d2.manager_id = m2.id  # Matched driver's manager
+                WHERE
+                    d1.kendra_id IN %s;
+            """, (tuple(driver_ids),))
+            driver_matches = local_cursor.fetchall()
+            columns = [desc[0] for desc in local_cursor.description]
+            driver_matches_df = pd.DataFrame(driver_matches, columns=columns)
+            
+            candidates = []
+            # Process each candidate by their unique ID
+            for cid in set(driver_matches_df['candidate_id']):
+                # Filter data for the current candidate
+                candidate_data = driver_matches_df[driver_matches_df['candidate_id'] == cid]
+                # Prepare the candidate dictionary
+                candidate_dict = {
+                    "id": cid,
+                    "name": candidate_data.iloc[0]['candidate_name'],
+                    "shift": candidate_data.iloc[0]['candidate_shift'],
+                    "manager": candidate_data.iloc[0]['candidate_manager'],
+                    # Add each matched driver's details to the candidate's matched_drivers list
+                    "matched_drivers": [
+                        {
+                            "id": row['matched_driver_id'],
+                            "name": row['matched_driver_name'],
+                            "shift": row['matched_driver_shift'],
+                            "manager": row['matched_driver_manager']
+                        }
+                        for _, row in candidate_data.iterrows()
+                    ]
+                }
+                candidates.append(candidate_dict)
+            return candidates
+
+
+
 def fetch_managers():
     with connect(localauth) as local_conn:
         with local_conn.cursor() as local_cursor:
