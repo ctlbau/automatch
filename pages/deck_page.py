@@ -10,6 +10,7 @@ from dash import dcc
 from dash import dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
+import json  # Added for serialization/deserialization
 
 dash.register_page(__name__)
 
@@ -99,7 +100,7 @@ layout = html.Div([
     ], style={'width': '80%', 'position': 'relative', 'marginTop': '20px'}),  # Adjust marginTop as needed
     html.Div(id='data-tables-container', children=[]),  # Container for dynamic data tables
     html.Button('Create Match', id='create-match', n_clicks=0, style={'marginTop': '20px', 'marginBottom': '20px'}),  # Button for creating matches
-    # dcc.Store(id='drivers-to-match-store'),  # Store for selected drivers' IDs
+    dcc.Store(id='drivers-to-match-store'),  # Store for selected drivers' IDs, modified to ensure JSON serialization
 ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
 
 @callback(
@@ -222,22 +223,24 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, street, 
 @callback(
     Output('drivers-to-match-store', 'data'),
     [Input({'type': 'drivers-table', 'index': ALL}, 'selected_rows')],
-    [State({'type': 'drivers-table', 'index': ALL}, 'data'),  # Assuming the full data is passed as a prop to the table
+    [State({'type': 'drivers-table', 'index': ALL}, 'data'),
      State('drivers-to-match-store', 'data')]
 )
 def update_drivers_to_match_store(selected_rows_list, tables_data, stored_data):
     if not stored_data:
         stored_data = []
 
+    all_kendra_ids = set()
     for selected_rows, table_data in zip(selected_rows_list, tables_data):
         if selected_rows:
-            # Extract kendra_id values for the selected rows
             selected_kendra_ids = [table_data[i]['kendra_id'] for i in selected_rows]
-            stored_data.extend(selected_kendra_ids)
+            all_kendra_ids.update(selected_kendra_ids)
 
-    return list(set(stored_data))
+    unique_kendra_ids = list(all_kendra_ids)
+    return unique_kendra_ids
 
-####### Navigation to the match page when the "Create Match" button is clicked #######
+
+####### Navigation to the match page when "Create Match" button is clicked #######
 @callback(
     Output('url', 'pathname'),  # Target the dcc.Location component
     [Input('create-match', 'n_clicks')],
