@@ -27,9 +27,13 @@ def create_candidate_component(candidate):
         dbc.Collapse(
             dbc.Card(
                 dbc.CardBody(
-                    [html.P("Matched with: " + driver["name"] + " with shift " + driver["shift"] + ". " + "They share vehicle: " + driver["vehicle"],
-                            style={'white-space': 'normal', 'overflow-x': 'auto', 'word-wrap': 'break-word'}) 
-                     for driver in candidate["matched_drivers"]],
+                    [dbc.Card(
+                        dbc.CardBody([
+                            html.H5(driver["name"], className="card-title"),
+                            html.P("Shift: " + driver["shift"]),
+                            html.P("Vehicle: " + driver["vehicle"])
+                        ])
+                    ) for driver in candidate["matched_drivers"]],
                     style={'max-width': '100%'}  # This applies a maximum width of 100% to the card body
                 ),
                 style={'width': '100%'}  # This ensures the card itself does not exceed the width of the button
