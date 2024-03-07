@@ -1,5 +1,6 @@
 import dash
-from dash import html, callback, Input, Output, State, callback_context, dcc
+from dash import html, callback, Input, Output, State, callback_context, dcc, MATCH
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
 from db.db_support import fetch_drivers_matches
@@ -14,17 +15,18 @@ def create_candidate_component(candidate):
     return html.Div([
         dbc.Button(
             candidate["name"],
-            id=f"collapse-button-{candidate['id']}",
+            id={"type": "collapse-button", "index": candidate['id']},  # Updated ID format
             className="mb-3",
             color="primary",
             n_clicks=0,
         ),
         dbc.Collapse(
             dbc.Card(dbc.CardBody([html.P(driver["name"]) for driver in candidate["matched_drivers"]])),
-            id=f"collapse-{candidate['id']}",
+            id={"type": "collapse", "index": candidate['id']},  # Updated ID format
             is_open=False,
         ),
     ])
+
 
 # Layout
 layout = html.Div([
@@ -52,6 +54,21 @@ def display_candidates(data):
         matches = json.loads(data)
         return [create_candidate_component(match) for match in matches]
     return []
+
+
+
+@callback(
+    Output({'type': 'collapse', 'index': MATCH}, 'is_open'),
+    [Input({'type': 'collapse-button', 'index': MATCH}, 'n_clicks')],
+    [State({'type': 'collapse', 'index': MATCH}, 'is_open')]
+)
+def toggle_collapse(n, is_open):
+    if n is None or n == 0:
+        raise PreventUpdate  # Correctly raising PreventUpdate here
+    return not is_open
+
+
+
 
 # @callback(
 #     [Output(f"collapse-{i}", "is_open") for i in range(10)],  # Assuming a maximum of 10 candidates
