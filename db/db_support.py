@@ -19,18 +19,19 @@ def fetch_drivers_matches(driver_ids):
                     d2.kendra_id AS matched_driver_id,
                     d2.name AS matched_driver_name,
                     s2.name AS matched_driver_shift,
-                    m2.name AS matched_driver_manager
+                    m2.name AS matched_driver_manager,
+                    v.plate AS matched_driver_plate
                 FROM
-                    DriversVehicles dv1
-                    JOIN DriversVehicles dv2 ON dv1.vehicle_id = dv2.vehicle_id
+                    Drivers d1
+                    LEFT JOIN DriversVehicles dv1 ON d1.kendra_id = dv1.driver_id
+                    LEFT JOIN DriversVehicles dv2 ON dv1.vehicle_id = dv2.vehicle_id
                         AND dv1.driver_id != dv2.driver_id
-                    JOIN Drivers d1 ON dv1.driver_id = d1.kendra_id
-                    JOIN Drivers d2 ON dv2.driver_id = d2.kendra_id
+                    LEFT JOIN Drivers d2 ON dv2.driver_id = d2.kendra_id
+                    LEFT JOIN Shifts s1 ON d1.shift_id = s1.id
                     LEFT JOIN Vehicles v ON dv1.vehicle_id = v.kendra_id
-                    LEFT JOIN Shifts s1 ON d1.shift_id = s1.id  # Candidate's shift
-                    LEFT JOIN Managers m1 ON d1.manager_id = m1.id  # Candidate's manager
-                    LEFT JOIN Shifts s2 ON d2.shift_id = s2.id  # Matched driver's shift
-                    LEFT JOIN Managers m2 ON d2.manager_id = m2.id  # Matched driver's manager
+                    LEFT JOIN Managers m1 ON d1.manager_id = m1.id
+                    LEFT JOIN Shifts s2 ON d2.shift_id = s2.id
+                    LEFT JOIN Managers m2 ON d2.manager_id = m2.id
                 WHERE
                     d1.kendra_id IN %s;
             """, (tuple(driver_ids),))
@@ -39,30 +40,30 @@ def fetch_drivers_matches(driver_ids):
             driver_matches_df = pd.DataFrame(driver_matches, columns=columns)
             
             candidates = []
-            # Process each candidate by their unique ID
-            for cid in set(driver_matches_df['candidate_id']):
-                # Filter data for the current candidate
-                candidate_data = driver_matches_df[driver_matches_df['candidate_id'] == cid]
-                # Prepare the candidate dictionary
+            grouped = driver_matches_df.groupby('candidate_id')
+            for cid, group in grouped:
+                candidate_row = group.iloc[0]
                 candidate_dict = {
                     "id": cid,
-                    "name": candidate_data.iloc[0]['candidate_name'],
-                    "shift": candidate_data.iloc[0]['candidate_shift'],
-                    "manager": candidate_data.iloc[0]['candidate_manager'],
-                    # Add each matched driver's details to the candidate's matched_drivers list
-                    "matched_drivers": [
-                        {
-                            "id": row['matched_driver_id'],
-                            "name": row['matched_driver_name'],
-                            "shift": row['matched_driver_shift'],
-                            "manager": row['matched_driver_manager']
-                        }
-                        for _, row in candidate_data.iterrows()
-                    ]
+                    "name": candidate_row['candidate_name'],
+                    "shift": candidate_row['candidate_shift'],
+                    "manager": candidate_row['candidate_manager'],
+                    "matched_drivers": []
                 }
+                # Only add matched drivers if they exist
+                matched_drivers = group[group['matched_driver_id'].notna()]
+                for _, row in matched_drivers.iterrows():
+                    matched_driver_dict = {
+                        "id": row['matched_driver_id'],
+                        "name": row['matched_driver_name'],
+                        "shift": row['matched_driver_shift'],
+                        "manager": row['matched_driver_manager'],
+                        "vehicle": row['matched_driver_plate']
+                    }
+                    candidate_dict["matched_drivers"].append(matched_driver_dict)
+                
                 candidates.append(candidate_dict)
             return candidates
-
 
 
 def fetch_managers():
