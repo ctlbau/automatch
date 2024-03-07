@@ -6,14 +6,16 @@ import pandas as pd
 import geopandas as gpd
 
 def fetch_drivers_matches(driver_ids):
+    if driver_ids is None:
+        return []
     with connect(localauth) as local_conn:
         with local_conn.cursor() as local_cursor:
             local_cursor.execute("""
                 SELECT DISTINCT
                     d1.kendra_id AS candidate_id,
                     d1.name AS candidate_name,
-                    s1.name AS candidate_shift,  # Assuming the candidate's shift name is also in the Shifts table
-                    m1.name AS candidate_manager,  # Assuming the candidate's manager name is also in the Managers table
+                    s1.name AS candidate_shift,
+                    m1.name AS candidate_manager,
                     d2.kendra_id AS matched_driver_id,
                     d2.name AS matched_driver_name,
                     s2.name AS matched_driver_shift,
@@ -24,6 +26,7 @@ def fetch_drivers_matches(driver_ids):
                         AND dv1.driver_id != dv2.driver_id
                     JOIN Drivers d1 ON dv1.driver_id = d1.kendra_id
                     JOIN Drivers d2 ON dv2.driver_id = d2.kendra_id
+                    LEFT JOIN Vehicles v ON dv1.vehicle_id = v.kendra_id
                     LEFT JOIN Shifts s1 ON d1.shift_id = s1.id  # Candidate's shift
                     LEFT JOIN Managers m1 ON d1.manager_id = m1.id  # Candidate's manager
                     LEFT JOIN Shifts s2 ON d2.shift_id = s2.id  # Matched driver's shift
