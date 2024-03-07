@@ -12,26 +12,39 @@ dash.register_page(__name__, path='/match_page')
 
 # Function to create a button and collapse component for each candidate
 def create_candidate_component(candidate):
+    button_id = {"type": "collapse-button", "index": candidate['id']}
+    collapse_id = {"type": "collapse", "index": candidate['id']}
+
     return html.Div([
         dbc.Button(
             candidate["name"],
-            id={"type": "collapse-button", "index": candidate['id']},  # Updated ID format
+            id=button_id,
             className="mb-3",
-            color="primary",
+            color="secondary",
             n_clicks=0,
+            style={'width': '100%'}  # Ensure the button takes full width of its container
         ),
         dbc.Collapse(
-            dbc.Card(dbc.CardBody([html.P(driver["name"]) for driver in candidate["matched_drivers"]])),
-            id={"type": "collapse", "index": candidate['id']},  # Updated ID format
+            dbc.Card(
+                dbc.CardBody(
+                    [html.P("Matched with: " + driver["name"] + " with shift " + driver["shift"] + ". " + "They share vehicle: " + driver["vehicle"],
+                            style={'white-space': 'normal', 'overflow-x': 'auto', 'word-wrap': 'break-word'}) 
+                     for driver in candidate["matched_drivers"]],
+                    style={'max-width': '100%'}  # This applies a maximum width of 100% to the card body
+                ),
+                style={'width': '100%'}  # This ensures the card itself does not exceed the width of the button
+            ),
+            id=collapse_id,
             is_open=False,
         ),
-    ])
+    ], style={'width': '100%'}  # This ensures the containing div also takes full width
+)
 
 
 # Layout
 layout = html.Div([
     dcc.Location(id='url', refresh=False),
-    html.Div(id='collapse-container', children=[]),
+    html.Div(id='collapse-container', children=[], className="d-flex flex-wrap justify-content-center"),  # Added classes for centering and wrapping
     html.Div(id="data-display"),  # Element to display the data
     dcc.Store(id='candidate-store')  # Store for candidates data
 ])
@@ -56,7 +69,6 @@ def display_candidates(data):
     return []
 
 
-
 @callback(
     Output({'type': 'collapse', 'index': MATCH}, 'is_open'),
     [Input({'type': 'collapse-button', 'index': MATCH}, 'n_clicks')],
@@ -66,24 +78,3 @@ def toggle_collapse(n, is_open):
     if n is None or n == 0:
         raise PreventUpdate  # Correctly raising PreventUpdate here
     return not is_open
-
-
-
-
-# @callback(
-#     [Output(f"collapse-{i}", "is_open") for i in range(10)],  # Assuming a maximum of 10 candidates
-#     [Input(f"collapse-button-{i}", "n_clicks") for i in range(10)],
-#     [State(f"collapse-{i}", "is_open") for i in range(10)] + [State('candidate-store', 'data')]
-# )
-# def toggle_collapse(*args):
-#     ctx = callback_context
-#     store_data = args[-1]  # Last argument is the store data
-#     candidates = json.loads(store_data) if store_data else []
-#     args = args[:-1]  # The rest are the callback arguments
-
-#     if not ctx.triggered:
-#         return [False for _ in range(10)]
-#     else:
-#         button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-#         candidate_id = int(button_id.split("-")[-1])
-#         return [not args[i] if candidate['id'] == candidate_id else args[i] for i, candidate in enumerate(candidates)]
