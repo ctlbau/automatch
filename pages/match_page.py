@@ -1,15 +1,13 @@
 import dash
-from dash import html, callback, Input, Output, State, callback_context
+from dash import html, callback, Input, Output, State, callback_context, dcc
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
+from db.db_support import fetch_drivers_matches
+import json
+import base64  # Added for decoding URL parameter
+from urllib.parse import parse_qs, urlparse  # Added for parsing URL
 
-dash.register_page(__name__)
-
-# Example data structure
-candidates = [
-    {"id": 1, "name": "Candidate A", "matched_drivers": [{"name": "Driver 1"}, {"name": "Driver 2"}]},
-    {"id": 2, "name": "Candidate B", "matched_drivers": [{"name": "Driver 3"}, {"name": "Driver 4"}]},
-]
+dash.register_page(__name__, path='/match_page')
 
 # Function to create a button and collapse component for each candidate
 def create_candidate_component(candidate):
@@ -28,54 +26,47 @@ def create_candidate_component(candidate):
         ),
     ])
 
-# Create the components for all candidates
-candidates_components = [create_candidate_component(candidate) for candidate in candidates]
-
 # Layout
-layout = html.Div(candidates_components)
+layout = html.Div([
+    dcc.Location(id='url', refresh=False),
+    html.Div(id='collapse-container', children=[]),
+    html.Div(id="data-display"),  # Element to display the data
+    dcc.Store(id='candidate-store')  # Store for candidates data
+])
+
+@callback(Output('candidate-store', 'data'), [Input('url', 'search')])
+def update_candidates_store(search):
+    parsed_search = parse_qs(search.lstrip('?'))
+    driver_ids_encoded = parsed_search.get('drivers', [None])[0]
+    if driver_ids_encoded:
+        driver_ids_decoded = base64.urlsafe_b64decode(driver_ids_encoded.encode()).decode()
+        driver_ids_decoded = json.loads(driver_ids_decoded)
+        matches = fetch_drivers_matches(driver_ids_decoded)
+        return json.dumps(matches)
+    return dash.no_update
 
 
-
-
-@callback(
-    [Output(f"collapse-{candidate['id']}", "is_open") for candidate in candidates],
-    [Input(f"collapse-button-{candidate['id']}", "n_clicks") for candidate in candidates],
-    [State(f"collapse-{candidate['id']}", "is_open") for candidate in candidates],
-)
-def toggle_collapse(*args):
-    ctx = callback_context
-
-    if not ctx.triggered:
-        # If nothing was triggered, return the current state
-        return [False for _ in candidates]
-    else:
-        # Find which button was clicked
-        button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-        
-        # Extract the candidate id from the button id
-        candidate_id = int(button_id.split("-")[-1])
-        
-        # Toggle the state of the corresponding collapse component
-        return [not args[len(candidates) + i] if candidate['id'] == candidate_id else args[len(candidates) + i] for i, candidate in enumerate(candidates)]
-
-# from dash import html, dcc, callback, Input, Output, State
-# import dash_bootstrap_components as dbc
-# from db.db_support import fetch_matched_drivers
-
-# layout = html.Div([
-#     # Add your layout components here
-# ])
+@callback(Output('collapse-container', 'children'), [Input('candidate-store', 'data')])
+def display_candidates(data):
+    if data:
+        matches = json.loads(data)
+        return [create_candidate_component(match) for match in matches]
+    return []
 
 # @callback(
-#     Output('match-details-container', 'children'), 
-#     Input('drivers-to-match-store', 'data')
+#     [Output(f"collapse-{i}", "is_open") for i in range(10)],  # Assuming a maximum of 10 candidates
+#     [Input(f"collapse-button-{i}", "n_clicks") for i in range(10)],
+#     [State(f"collapse-{i}", "is_open") for i in range(10)] + [State('candidate-store', 'data')]
 # )
-# def update_match_details(kendra_ids):
-#     if kendra_ids:
-#         matched_drivers_df = fetch_matched_drivers(kendra_ids)
-#         # Convert the DataFrame to editable forms or display components
-#         # This part depends on how you want to display and edit the data
-#         return html.Div([
-#             # Create and return your display components based on matched_drivers_df
-#         ])
-#     return "No matched drivers found."
+# def toggle_collapse(*args):
+#     ctx = callback_context
+#     store_data = args[-1]  # Last argument is the store data
+#     candidates = json.loads(store_data) if store_data else []
+#     args = args[:-1]  # The rest are the callback arguments
+
+#     if not ctx.triggered:
+#         return [False for _ in range(10)]
+#     else:
+#         button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+#         candidate_id = int(button_id.split("-")[-1])
+#         return [not args[i] if candidate['id'] == candidate_id else args[i] for i, candidate in enumerate(candidates)]

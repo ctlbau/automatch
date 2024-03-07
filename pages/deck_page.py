@@ -10,9 +10,11 @@ from dash import dcc
 from dash import dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
-import json  # Added for serialization/deserialization
+import json
+import base64
+from dash import register_page
 
-dash.register_page(__name__)
+register_page(__name__, path='/')
 
 BASE_URL = "http://localhost:8989/isochrone"
 
@@ -21,7 +23,7 @@ MAPBOX_API_KEY = os.getenv("MAPBOX_TOKEN")
 MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
 CHOSEN_STYLE = MAP_STYLES[0]
 
-layout = html.Div([
+layout = html.Div([ 
         dcc.Location(id='url', refresh=True), # This enables page navigation
     # Container for inputs and button
     html.Div([
@@ -98,9 +100,9 @@ layout = html.Div([
             type="circle"
         ),
     ], style={'width': '80%', 'position': 'relative', 'marginTop': '20px'}),  # Adjust marginTop as needed
+    html.Div(id="data-display-deck"),  # Store for selected drivers' IDs, modified to ensure JSON serialization
     html.Div(id='data-tables-container', children=[]),  # Container for dynamic data tables
     html.Button('Create Match', id='create-match', n_clicks=0, style={'marginTop': '20px', 'marginBottom': '20px'}),  # Button for creating matches
-    dcc.Store(id='drivers-to-match-store'),  # Store for selected drivers' IDs, modified to ensure JSON serialization
 ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
 
 @callback(
@@ -237,15 +239,26 @@ def update_drivers_to_match_store(selected_rows_list, tables_data, stored_data):
             all_kendra_ids.update(selected_kendra_ids)
 
     unique_kendra_ids = list(all_kendra_ids)
-    return unique_kendra_ids
+    return json.dumps(unique_kendra_ids)
 
-
-####### Navigation to the match page when "Create Match" button is clicked #######
 @callback(
-    Output('url', 'pathname'),  # Target the dcc.Location component
-    [Input('create-match', 'n_clicks')],
+    Output('data-display-deck', 'children'),  # Target the dcc.Location component
+    [Input('drivers-to-match-store', 'data')],
     prevent_initial_call=True  # Prevent navigation on initial load
 )
-def navigate_to_match_page(n_clicks):
+def display_data(data):
+    if data:
+        return data
+    return "No data to display."
+
+@callback(
+    Output('url', 'href'), 
+    [Input('create-match', 'n_clicks')],
+    [State('drivers-to-match-store', 'data')],  # Access the state of drivers-to-match-store
+    prevent_initial_call=True  # Prevent navigation on initial load
+)
+def navigate_to_match_page(n_clicks, drivers_data):
     if n_clicks:
-        return '/match_page' 
+        encoded_data = base64.urlsafe_b64encode(drivers_data.encode()).decode()
+        return f'/match_page?drivers={encoded_data}'
+    
