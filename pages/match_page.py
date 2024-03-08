@@ -15,7 +15,7 @@ def create_candidate_component(candidate):
     button_id = {"type": "collapse-button", "index": candidate['id']}
     collapse_id = {"type": "collapse", "index": candidate['id']}
 
-    return html.Div([  # This div wraps each button-collapse pair
+    return html.Div([  
         html.Div([
             dbc.Button(
                 candidate["name"],
@@ -28,23 +28,31 @@ def create_candidate_component(candidate):
                 dbc.Card(
                     dbc.CardBody(
                         [dbc.Card(
-                            dbc.CardBody([  
+                            dbc.CardBody([
                                 html.H5(matched_driver["name"], className="card-title"),
                                 html.P("Manager: " + (matched_driver["manager"] if matched_driver["manager"] is not None else "Not assigned")),
                                 html.P("Shift: " + (matched_driver["shift"] if matched_driver["shift"] is not None else "Not assigned")),
-                                html.P("Vehicle: " + matched_driver["vehicle"])
-                            ], style={'margin': '10px'})  # Added margin for separation
+                                html.P("Vehicle: " + matched_driver["vehicle"]),
+                                dbc.Button(
+                                    "Unmatch",
+                                    id={"type": "unmatch-button", "candidate_id": candidate['id'], "driver_id": matched_driver['id']},
+                                    className="mt-2",
+                                    color="danger",
+                                    n_clicks=0
+                                )
+                            ], style={'margin': '10px'})
                         ) for matched_driver in candidate["matched_drivers"]],
-                        style={'display': 'flex', 'flex-wrap': 'wrap', 'justify-content': 'start', 'margin': '10px'}  # Adjusted for side by side display with wrap and margin for separation
+                        style={'display': 'flex', 'flex-wrap': 'wrap', 'justify-content': 'start', 'margin': '10px'}
                     ),
-                    style={'width': '100%'}  # This ensures the card itself does not exceed the width of the button
+                    style={'width': '100%'}
                 ),
                 id=collapse_id,
                 is_open=False,
             ),
-        ], style={'margin-right': '20px', 'flex': '1 1 0', 'display': 'flex', 'flex-direction': 'column'}),  # This styles each pair as a column
-    ], style={'display': 'flex', 'flex-wrap': 'wrap', 'justify-content': 'start'}  # This styles the overall container
+        ], style={'margin-right': '20px', 'flex': '1 1 0', 'display': 'flex', 'flex-direction': 'column'}),
+    ], style={'display': 'flex', 'flex-wrap': 'wrap', 'justify-content': 'start'}
     )
+
 
 
 # Layout
