@@ -15,43 +15,67 @@ def create_candidate_component(candidate):
     button_id = {"type": "collapse-button", "index": candidate['id']}
     collapse_id = {"type": "collapse", "index": candidate['id']}
 
-    return html.Div([  
-        html.Div([
-            dbc.Button(
-                candidate["name"],
-                id=button_id,
-                className="mb-3",
-                color="secondary",
-                n_clicks=0
-            ),
-            dbc.Collapse(
-                dbc.Card(
-                    dbc.CardBody(
-                        [dbc.Card(
-                            dbc.CardBody([
-                                html.H5(matched_driver["name"], className="card-title"),
-                                html.P("Manager: " + (matched_driver["manager"] if matched_driver["manager"] is not None else "Not assigned")),
-                                html.P("Shift: " + (matched_driver["shift"] if matched_driver["shift"] is not None else "Not assigned")),
-                                html.P("Vehicle: " + matched_driver["vehicle"]),
-                                dbc.Button(
-                                    "Unmatch",
-                                    id={"type": "unmatch-button", "candidate_id": candidate['id'], "driver_id": matched_driver['id']},
-                                    className="mt-2",
-                                    color="danger",
-                                    n_clicks=0
-                                )
-                            ], style={'margin': '10px'})
-                        ) for matched_driver in candidate["matched_drivers"]],
-                        style={'display': 'flex', 'flex-wrap': 'wrap', 'justify-content': 'start', 'margin': '10px'}
-                    ),
-                    style={'width': '100%'}
-                ),
-                id=collapse_id,
-                is_open=False,
-            ),
-        ], style={'margin-right': '20px', 'flex': '1 1 0', 'display': 'flex', 'flex-direction': 'column'}),
-    ], style={'display': 'flex', 'flex-wrap': 'wrap', 'justify-content': 'start'}
+    # Button for the candidate
+    candidate_button = dbc.Button(
+        candidate["name"],
+        id=button_id,
+        className="mb-3",
+        color="secondary",
+        n_clicks=0
     )
+    # Card for candidate
+    candidate_card = dbc.Card(
+        dbc.CardBody([
+            html.H5(candidate["name"], className="card-title"),
+            html.P("ID: " + str(candidate["id"])),
+            html.P("Manager: " + (candidate["manager"] if candidate["manager"] is not None else "Not assigned")),
+            html.P("Shift: " + (candidate["shift"] if candidate["shift"] is not None else "Not assigned")),
+            dbc.Button(
+                "Unmatch All",
+                id={"type": "unmatch-all-button", "candidate_id": candidate['id']},
+                className="mt-2",
+                color="danger",
+                n_clicks=0
+            )
+        ], style={'margin': '10px'})
+    )
+
+    # Cards for each matched driver
+    matched_drivers_cards = [
+        dbc.Card(
+            dbc.CardBody([
+                html.H5(matched_driver["name"], className="card-title"),
+                html.P("ID: " + str(matched_driver["id"])),
+                html.P("Manager: " + (matched_driver["manager"] if matched_driver["manager"] is not None else "Not assigned")),
+                html.P("Shift: " + (matched_driver["shift"] if matched_driver["shift"] is not None else "Not assigned")),
+                html.P("Vehicle: " + matched_driver["vehicle"]),
+                dbc.Button(
+                    "Unmatch",
+                    id={"type": "unmatch-button", "candidate_id": candidate['id'], "driver_id": matched_driver['id']},
+                    className="mt-2",
+                    color="warning",
+                    n_clicks=0
+                )
+            ], style={'margin': '10px'})
+        ) for matched_driver in candidate["matched_drivers"]
+    ]
+
+    # Collapse component that toggles the visibility of the candidate card
+    candidate_collapse = dbc.Collapse(
+        dbc.Card(candidate_card, className="mb-2"),
+        id=collapse_id,
+        is_open=False,
+    )
+
+    # Wrapping the button and collapse component together
+    component_structure = html.Div([
+        candidate_button,
+        candidate_collapse,
+        *matched_drivers_cards
+    ], style={'width': '33%', 'margin-bottom': '20px'})
+
+    return component_structure
+
 
 
 
