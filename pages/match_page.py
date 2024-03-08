@@ -15,34 +15,36 @@ def create_candidate_component(candidate):
     button_id = {"type": "collapse-button", "index": candidate['id']}
     collapse_id = {"type": "collapse", "index": candidate['id']}
 
-    return html.Div([
-        dbc.Button(
-            candidate["name"],
-            id=button_id,
-            className="mb-3",
-            color="secondary",
-            n_clicks=0,
-            style={'width': '100%'}  # Ensure the button takes full width of its container
-        ),
-        dbc.Collapse(
-            dbc.Card(
-                dbc.CardBody(
-                    [dbc.Card(
-                        dbc.CardBody([
-                            html.H5(driver["name"], className="card-title"),
-                            html.P("Shift: " + driver["shift"]),
-                            html.P("Vehicle: " + driver["vehicle"])
-                        ])
-                    ) for driver in candidate["matched_drivers"]],
-                    style={'max-width': '100%'}  # This applies a maximum width of 100% to the card body
-                ),
-                style={'width': '100%'}  # This ensures the card itself does not exceed the width of the button
+    return html.Div([  # This div wraps each button-collapse pair
+        html.Div([
+            dbc.Button(
+                candidate["name"],
+                id=button_id,
+                className="mb-3",
+                color="secondary",
+                n_clicks=0
             ),
-            id=collapse_id,
-            is_open=False,
-        ),
-    ], style={'width': '100%'}  # This ensures the containing div also takes full width
-)
+            dbc.Collapse(
+                dbc.Card(
+                    dbc.CardBody(
+                        [dbc.Card(
+                            dbc.CardBody([  
+                                html.H5(matched_driver["name"], className="card-title"),
+                                html.P("Manager: " + (matched_driver["manager"] if matched_driver["manager"] is not None else "Not assigned")),
+                                html.P("Shift: " + (matched_driver["shift"] if matched_driver["shift"] is not None else "Not assigned")),
+                                html.P("Vehicle: " + matched_driver["vehicle"])
+                            ], style={'margin': '10px'})  # Added margin for separation
+                        ) for matched_driver in candidate["matched_drivers"]],
+                        style={'display': 'flex', 'flex-wrap': 'wrap', 'justify-content': 'start', 'margin': '10px'}  # Adjusted for side by side display with wrap and margin for separation
+                    ),
+                    style={'width': '100%'}  # This ensures the card itself does not exceed the width of the button
+                ),
+                id=collapse_id,
+                is_open=False,
+            ),
+        ], style={'margin-right': '20px', 'flex': '1 1 0', 'display': 'flex', 'flex-direction': 'column'}),  # This styles each pair as a column
+    ], style={'display': 'flex', 'flex-wrap': 'wrap', 'justify-content': 'start'}  # This styles the overall container
+    )
 
 
 # Layout
