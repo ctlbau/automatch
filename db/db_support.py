@@ -5,6 +5,28 @@ import json
 import pandas as pd
 import geopandas as gpd
 
+def unmatch_drivers(candidate_id, matched_driver_id):
+    with connect(localauth) as local_conn:
+        with local_conn.cursor() as local_cursor:
+            # Find vehicle IDs shared by both drivers
+            local_cursor.execute("""
+                SELECT dv1.vehicle_id
+                FROM DriversVehicles dv1
+                JOIN DriversVehicles dv2 ON dv1.vehicle_id = dv2.vehicle_id
+                WHERE dv1.driver_id = %s AND dv2.driver_id = %s;
+            """, (candidate_id, matched_driver_id))
+            shared_vehicle_ids = local_cursor.fetchall()
+
+            # For each shared vehicle, remove the link between the vehicle and each driver
+            for vehicle_id in shared_vehicle_ids:
+                local_cursor.execute("""
+                    DELETE FROM DriversVehicles
+                    WHERE (driver_id = %s OR driver_id = %s) AND vehicle_id = %s;
+                """, (candidate_id, matched_driver_id, vehicle_id[0]))
+
+            local_conn.commit()  # Commit the changes to the database
+
+
 def fetch_drivers_matches(driver_ids):
     if driver_ids is None:
         return []
