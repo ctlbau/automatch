@@ -12,8 +12,8 @@ from datetime import datetime
 
 dash.register_page(__name__, path='/match_page')
 
-# Update the candidate-store with the matches for the drivers in the URL
-@callback(Output('candidate-store', 'data'), [Input('url', 'search')])
+# Update the url-candidates-store with the matches for the drivers in the URL
+@callback(Output('url-candidates-store', 'data'), [Input('url', 'search')])
 def update_candidates_store(search):
     parsed_search = parse_qs(search.lstrip('?'))
     driver_ids_encoded = parsed_search.get('drivers', [None])[0]
@@ -109,42 +109,45 @@ confirmation_dialog = dbc.Modal(
 # Layout
 layout = html.Div([
     dcc.Location(id='url', refresh=False),
-    html.Div(id='data-display-page', children=[]),  # Added a div to display the data
+    # html.Div(id='data-display-page', children=[]),  # Added a div to display the data
     html.Div(id='collapse-container', children=[], className="d-flex flex-wrap justify-content-center"),  # Added classes for centering and wrapping
-    dcc.Store(id='candidate-store'),  # Store for candidates data
+    dcc.Store(id='url-candidates-store'),  # Store for candidates data
     dcc.Store(id='clicked-unmatch-button-store'),
     confirmation_dialog
 ])
 
-@callback(
-    Output('data-display-page', 'children'),  # Target the dcc.Location component
-    [Input('clicked-unmatch-button-store', 'data')],
-    # prevent_initial_call=True  # Prevent navigation on initial load
-)
-def display_data(data):
-    if data:
-        return data
-    return "No data to display."
+# @callback(
+#     Output('data-display-page', 'children'),  # Target the dcc.Location component
+#     [Input('clicked-unmatch-button-store', 'data')],
+#     # prevent_initial_call=True  # Prevent navigation on initial load
+# )
+# def display_data(data):
+#     if data:
+#         return data
+#     return "No data to display."
 
 
-@callback(Output('collapse-container', 'children'), [Input('candidate-store', 'data')])
-def display_candidates(data_store):
-    if data_store:
-        data_dict = json.loads(data_store)
-        matches = data_dict.get("matches", [])
-        return [create_candidate_component(match) for match in matches]
-    return []
+@callback(Output('collapse-container', 'children'), 
+          [Input('url-candidates-store', 'modified_timestamp')],
+          [State('url-candidates-store', 'data')])
+def display_candidates(ts, data_store):
+    if data_store is None:
+        raise PreventUpdate
+    data_dict = json.loads(data_store)
+    matches = data_dict.get("matches", [])
+    return [create_candidate_component(match) for match in matches]
+
 
 @callback(
     Output('confirmation-dialog', 'is_open'),
-    Output('candidate-store', 'data', allow_duplicate=True),
+    Output('url-candidates-store', 'data', allow_duplicate=True),
     Output('clicked-unmatch-button-store', 'data'),  # Add this output
     [Input({'type': 'unmatch-button', 'candidate_id': ALL, 'driver_id': ALL}, 'n_clicks'), # Card unmatch buttons
      Input('confirm-unmatch', 'n_clicks'), # Dialog Confirm unmatch button
      Input('cancel-unmatch', 'n_clicks')], # Dialog Cancel unmatch button
     [State('confirmation-dialog', 'is_open'),
      State({'type': 'unmatch-button', 'candidate_id': ALL, 'driver_id': ALL}, 'id'),
-     State('candidate-store', 'data'),
+     State('url-candidates-store', 'data'),
      State('clicked-unmatch-button-store', 'data')],  # Add this state
      prevent_initial_call=True
 )
@@ -167,11 +170,6 @@ def handle_dialog_and_unmatch(unmatch_clicks, confirm_click, cancel_click, is_op
         ids_to_store = json.dumps({'candidate_id': candidate_id, 'driver_id': driver_id})
         return True, dash.no_update, ids_to_store
     elif 'confirm-unmatch' in button_clicked and is_open:
-        # Correctly extract candidate_id and driver_id from the button_id
-        # Assuming button_id is a list of dictionaries, find the dictionary that matches the clicked unmatch-button
-        # triggered_button_info = next((item for item in button_id if 'unmatch-button' in item['type']), None)
-        # if not triggered_button_info:
-        #     raise PreventUpdate
         clicked_unmatch_button = json.loads(clicked_unmatch_button)
         if not clicked_unmatch_button:
             raise PreventUpdate
