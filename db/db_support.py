@@ -5,6 +5,32 @@ import json
 import pandas as pd
 import geopandas as gpd
 
+def match_drivers_to_vehicle(driver_ids, vehicle_plate):
+    with connect(localauth) as local_conn:
+        with local_conn.cursor() as local_cursor:
+            # Find the vehicle ID based on the provided plate number
+            local_cursor.execute("""
+                SELECT kendra_id
+                FROM Vehicles
+                WHERE plate = %s;
+            """, (vehicle_plate,))
+            vehicle_result = local_cursor.fetchone()
+
+            if vehicle_result:
+                vehicle_id = vehicle_result[0]
+                # For each driver ID, create a new record in DriversVehicles for this vehicle
+                for driver_id in driver_ids:
+                    local_cursor.execute("""
+                        INSERT INTO DriversVehicles (driver_id, vehicle_id)
+                        VALUES (%s, %s)
+                        ON DUPLICATE KEY UPDATE vehicle_id = vehicle_id;
+                    """, (driver_id, vehicle_id))
+
+                local_conn.commit()  # Commit the changes to the database
+            else:
+                print("Vehicle with plate", vehicle_plate, "not found.")
+
+
 def unmatch_drivers(candidate_id, matched_driver_id):
     with connect(localauth) as local_conn:
         with local_conn.cursor() as local_cursor:
@@ -174,6 +200,18 @@ def fetch_drivers():
             ]
             
     return drivers_df, drivers_gdf, drivers_list_dict
+
+def fetch_vehicle_plates():
+    with connect(localauth) as local_conn:  # Replace `connect(localauth)` with your actual database connection function
+        with local_conn.cursor() as local_cursor:
+            local_cursor.execute("""
+                SELECT DISTINCT plate
+                FROM Vehicles
+                ORDER BY plate ASC;
+            """)
+            plates = local_cursor.fetchall()
+            return [plate[0] for plate in plates]  # Extract plate numbers from the tuples
+
 
 # def fetch_drivers():
 #     query = """

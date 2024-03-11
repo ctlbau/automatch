@@ -3,7 +3,7 @@ from dash import html, callback, Input, Output, State, callback_context, dcc, MA
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
-from db.db_support import fetch_drivers_matches, unmatch_drivers
+from db.db_support import fetch_drivers_matches, unmatch_drivers, match_drivers_to_vehicle, fetch_vehicle_plates
 import json
 import base64  # Added for decoding URL parameter
 from urllib.parse import parse_qs, urlparse  # Added for parsing URL
@@ -46,13 +46,6 @@ def create_candidate_component(candidate):
             html.P("ID: " + str(int(candidate["id"]))),
             html.P("Manager: " + (candidate["manager"] if candidate["manager"] is not None else "Not assigned")),
             html.P("Shift: " + (candidate["shift"] if candidate["shift"] is not None else "Not assigned")),
-            # dbc.Button(
-            #     "Unmatch All",
-            #     id={"type": "unmatch-all-button", "candidate_id": candidate['id']},
-            #     className="mt-2",
-            #     color="danger",
-            #     n_clicks=0
-            # )
         ], style={'margin': '10px'})
     )
 
@@ -71,7 +64,7 @@ def create_candidate_component(candidate):
                     className="mt-2",
                     color="warning",
                     n_clicks=0
-                )
+                ),
             ], style={'margin': '10px'})
         ) for matched_driver in candidate["matched_drivers"]
     ]
@@ -87,12 +80,12 @@ def create_candidate_component(candidate):
     component_structure = html.Div([
         candidate_modal_button,
         candidate_collapse,
-        *matched_drivers_cards
+        *matched_drivers_cards,
     ], style={'width': '33%', 'margin-bottom': '20px'})
 
     return component_structure
 
-confirmation_dialog = dbc.Modal(
+unmatch_confirmation_dialog = dbc.Modal(
     [
         dbc.ModalBody("Are you sure you want to unmatch this driver?"),
         dbc.ModalFooter(
@@ -102,29 +95,69 @@ confirmation_dialog = dbc.Modal(
             ]
         ),
     ],
-    id="confirmation-dialog",
+    id="unmatch-confirmation-dialog",
     is_open=False,
+)
+
+match_confirmation_dialog = dbc.Modal(
+    [
+        dbc.ModalBody("Are you sure you want to match these drivers?"),
+        dbc.ModalFooter(
+            [
+                dbc.Button("Cancel", id="cancel-match", className="ml-auto"),
+                dbc.Button("Match", id="confirm-match", className="ml-auto", color="success"),
+            ]
+        ),
+    ],
+    id="match-confirmation-dialog",
+    is_open=False,
+)
+
+# Match button
+match_button = dbc.Button(
+        "Match",
+        id="match-button",
+        className="mb-3",
+        color="success",
+        n_clicks=0,
+        disabled=True,  # Initially disabled
+    )
+
+# Dropdown for selecting vehicle plates
+vehicle_plate_dropdown = dcc.Dropdown(
+    id='vehicle-plate-dropdown',
+    options=[{'label': plate, 'value': plate} for plate in fetch_vehicle_plates()],
+    placeholder="Select a vehicle plate",
+    clearable=False,
+    style={'width': '100%'},  # Set the width of the dropdown to be wider
+)
+
+# Toast notification for successful match
+match_success_toast = dbc.Toast(
+    id="match-toast",
+    header="Match Successful",
+    is_open=False,
+    dismissable=True,
+    icon="success",
+    duration=10000,
+    style={"position": "fixed", "top": 10, "right": 10, "width": 350},
 )
 
 # Layout
 layout = html.Div([
     dcc.Location(id='url', refresh=False),
-    # html.Div(id='data-display-page', children=[]),  # Added a div to display the data
+    html.Div([
+        html.Div(vehicle_plate_dropdown, id="vehicle-plate-dropdown-container", style={'display': 'inline-block', 'marginRight': '10px', 'width': '300px'}, className="d-flex justify-content-center"),
+        html.Div(match_button, id="match-button-container", style={'display': 'inline-block'}, className="d-flex justify-content-center"),
+        match_success_toast,
+    ], className="d-flex justify-content-center", style={'marginBottom': '10px'}),
     html.Div(id='collapse-container', children=[], className="d-flex flex-wrap justify-content-center"),  # Added classes for centering and wrapping
     dcc.Store(id='url-candidates-store'),  # Store for candidates data
     dcc.Store(id='clicked-unmatch-button-store'),
-    confirmation_dialog
+    unmatch_confirmation_dialog,
+    match_confirmation_dialog,
+      # Include the toast notification in the layout
 ])
-
-# @callback(
-#     Output('data-display-page', 'children'),  # Target the dcc.Location component
-#     [Input('clicked-unmatch-button-store', 'data')],
-#     # prevent_initial_call=True  # Prevent navigation on initial load
-# )
-# def display_data(data):
-#     if data:
-#         return data
-#     return "No data to display."
 
 
 @callback(Output('collapse-container', 'children'), 
@@ -135,30 +168,32 @@ def display_candidates(ts, data_store):
         raise PreventUpdate
     data_dict = json.loads(data_store)
     matches = data_dict.get("matches", [])
+    matches = fetch_drivers_matches([match["id"] for match in matches])
     return [create_candidate_component(match) for match in matches]
 
 
 @callback(
-    Output('confirmation-dialog', 'is_open'),
+    Output('unmatch-confirmation-dialog', 'is_open'),
     Output('url-candidates-store', 'data', allow_duplicate=True),
-    Output('clicked-unmatch-button-store', 'data'),  # Add this output
+    Output('clicked-unmatch-button-store', 'data'),
+    Output('match-toast', 'is_open', allow_duplicate=True),  # Added output for the toast notification
+    Output('match-toast', 'children', allow_duplicate=True),  # Added output for the toast notification content
     [Input({'type': 'unmatch-button', 'candidate_id': ALL, 'driver_id': ALL}, 'n_clicks'), # Card unmatch buttons
      Input('confirm-unmatch', 'n_clicks'), # Dialog Confirm unmatch button
      Input('cancel-unmatch', 'n_clicks')], # Dialog Cancel unmatch button
-    [State('confirmation-dialog', 'is_open'),
+    [State('unmatch-confirmation-dialog', 'is_open'),
      State({'type': 'unmatch-button', 'candidate_id': ALL, 'driver_id': ALL}, 'id'),
      State('url-candidates-store', 'data'),
      State('clicked-unmatch-button-store', 'data')],  # Add this state
      prevent_initial_call=True
 )
-def handle_dialog_and_unmatch(unmatch_clicks, confirm_click, cancel_click, is_open, button_id, data_store, clicked_unmatch_button):
+def handle_unmatch(unmatch_clicks, confirm_click, cancel_click, is_open, button_id, data_store, clicked_unmatch_button):
     if not button_id or not any(unmatch_clicks):
         raise PreventUpdate
     ctx = callback_context
 
     # Determine which button was clicked
     button_clicked = ctx.triggered[0]['prop_id'].split('.')[0]
-    print("Button clicked:", button_clicked)
 
     if 'unmatch-button' in button_clicked:
         # Open the dialog
@@ -168,24 +203,74 @@ def handle_dialog_and_unmatch(unmatch_clicks, confirm_click, cancel_click, is_op
         driver_id = button_info['driver_id']
         # Store these IDs in clicked-unmatch-button-store
         ids_to_store = json.dumps({'candidate_id': candidate_id, 'driver_id': driver_id})
-        return True, dash.no_update, ids_to_store
+        return True, dash.no_update, ids_to_store, dash.no_update, dash.no_update
     elif 'confirm-unmatch' in button_clicked and is_open:
         clicked_unmatch_button = json.loads(clicked_unmatch_button)
         if not clicked_unmatch_button:
             raise PreventUpdate
-        candidate_id = clicked_unmatch_button['candidate_id']
+        candidate_id = clicked_unmatch_button['candidate_id'] 
         driver_id = clicked_unmatch_button['driver_id']
-        print("Candidate id:", candidate_id)
-        print("Driver id:", driver_id)
         # Perform the unmatch operation
         unmatch_drivers(candidate_id, driver_id)
+        # Update the data store with with new ts to trigger the display_candidates callback
         data_dict = json.loads(data_store)
         matches = data_dict.get("matches", [])
         # Close the dialog and force page refresh components to reflect the unmatch
-        return False, json.dumps(add_metadata_to_data(matches)), dash.no_update  # No update to the store
+        unmatched_driver_name = [match["name"] for match in matches if match["id"] == driver_id][0]
+        unmatched_info = f"Unmatched driver: {unmatched_driver_name}"
+        return False, json.dumps(add_metadata_to_data(matches)), dash.no_update, True, unmatched_info
     elif 'cancel-unmatch' in button_clicked and is_open:
         # Just close the dialog without doing anything
         return False, dash.no_update, dash.no_update  # No update to the store
+    else:
+        raise PreventUpdate
+
+@callback(
+    Output('match-button', 'disabled'),
+    [Input('vehicle-plate-dropdown', 'value')]
+)
+def toggle_match_button_state(selected_plate):
+    return selected_plate is None
+
+@callback(
+    Output('match-confirmation-dialog', 'is_open'),
+    Output('url-candidates-store', 'data', allow_duplicate=True),
+    Output('match-toast', 'is_open'),  # Added output for the toast notification
+    Output('match-toast', 'children'),  # Added output for the toast notification content
+    [Input('match-button', 'n_clicks'), # Match button
+     Input('confirm-match', 'n_clicks'), # Dialog Confirm match button
+     Input('cancel-match', 'n_clicks')], # Dialog Cancel match button
+    [State('match-confirmation-dialog', 'is_open'),
+     State('url-candidates-store', 'data'),
+     State('vehicle-plate-dropdown', 'value')],  # Add this state for selected vehicle plate
+     prevent_initial_call=True
+)
+def handle_match(match_click, confirm_click, cancel_click, is_open, data_store, selected_plate):
+    if not any([match_click, confirm_click, cancel_click]):
+        raise PreventUpdate
+    ctx = callback_context
+
+    # Determine which button was clicked
+    button_clicked = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    if 'match-button' in button_clicked and selected_plate:
+        # Open the dialog
+        return True, dash.no_update, dash.no_update, dash.no_update  # Adjusted for the correct number of outputs
+    elif 'confirm-match' in button_clicked and is_open:
+        # Perform the match operation
+        data_dict = json.loads(data_store)
+        matches = data_dict.get("matches", [])
+        driver_ids = [match["id"] for match in matches]
+        match_drivers_to_vehicle(driver_ids, selected_plate)
+        # Update the data store with new ts to trigger the display_candidates callback
+        # Close the dialog and force page refresh components to reflect the match
+        matched_drivers_names = [match["name"] for match in matches]
+        matched_info = f"Matched drivers: {', '.join(matched_drivers_names)} to vehicle {selected_plate}"
+        # Show the toast notification with the matched information
+        return False, json.dumps(add_metadata_to_data(matches)), True, matched_info
+    elif 'cancel-match' in button_clicked and is_open:
+        # Just close the dialog without doing anything
+        return False, dash.no_update, dash.no_update, dash.no_update  # Adjusted for the correct number of outputs
     else:
         raise PreventUpdate
 
@@ -202,5 +287,5 @@ def toggle_collapse(n, is_open):
 def add_metadata_to_data(data):
     return {
         "matches": data,
-        "last_updated": datetime.now().isoformat()  # Use the current timestamp as metadata
+        "last_updated": datetime.now().isoformat()
     }
