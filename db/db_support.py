@@ -164,25 +164,31 @@ def fetch_drivers():
     with connect(localauth) as local_conn:
         with local_conn.cursor() as local_cursor:
             local_cursor.execute("""SELECT
-                                    D.kendra_id,
-                                    D.name AS name,
-                                    D.street,
-                                    D.city,
-                                    D.country,
-                                    D.zip_code,
-                                    D.lat,
-                                    D.lng,
-                                    P.name AS province,
-                                    M.name AS manager,
-                                    S.name AS shift
-                                FROM
-                                    Drivers D
-                                    LEFT JOIN Provinces P ON D.province_id = P.id
-                                    LEFT JOIN Managers M ON D.manager_id = M.id
-                                    LEFT JOIN Shifts S ON D.shift_id = S.id;""")
+                            D.kendra_id,
+                            D.name AS name,
+                            D.street,
+                            D.city,
+                            D.country,
+                            D.zip_code,
+                            D.lat,
+                            D.lng,
+                            P.name AS province,
+                            M.name AS manager,
+                            S.name AS shift,
+                            MAX(CASE WHEN DV.driver_id IS NOT NULL THEN TRUE ELSE FALSE END) AS is_matched
+                        FROM
+                            Drivers D
+                            LEFT JOIN Provinces P ON D.province_id = P.id
+                            LEFT JOIN Managers M ON D.manager_id = M.id
+                            LEFT JOIN Shifts S ON D.shift_id = S.id
+                            LEFT JOIN DriversVehicles DV ON D.kendra_id = DV.driver_id
+                        GROUP BY
+                            D.kendra_id, D.name, D.street, D.city, D.country, D.zip_code, D.lat, D.lng, P.name, M.name, S.name;""")
             drivers = local_cursor.fetchall()
             columns = [desc[0] for desc in local_cursor.description]
             drivers_df = pd.DataFrame(drivers, columns=columns)
+            # Convert is_matched to boolean
+            drivers_df['is_matched'] = drivers_df['is_matched'].astype(bool)
             # Convert DataFrame to GeoDataFrame
             drivers_gdf = gpd.GeoDataFrame(drivers_df, geometry=gpd.points_from_xy(drivers_df.lng, drivers_df.lat))
             drivers_gdf.set_crs(epsg=4326, inplace=True)

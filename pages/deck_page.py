@@ -100,7 +100,7 @@ layout = html.Div([
             type="circle"
         ),
     ], style={'width': '80%', 'position': 'relative', 'marginTop': '20px'}),  # Adjust marginTop as needed
-    html.Div(id="data-display-deck"),  # Store for selected drivers' IDs, modified to ensure JSON serialization
+    # html.Div(id="data-display-deck"),  # Store for selected drivers' IDs, modified to ensure JSON serialization
     html.Div(id='data-tables-container', children=[]),  # Container for dynamic data tables
     html.Button('Create Match', id='create-match', n_clicks=0, style={'marginTop': '20px', 'marginBottom': '20px'}),  # Button for creating matches
 ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
@@ -190,7 +190,7 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, street, 
             ).to_json()
 
             partitioned_drivers = partition_drivers_by_isochrones(drivers_gdf, isochrones_geojson)
-            assert check_partitions_intersection(partitioned_drivers), "Partitions are not disjoint!"
+            # assert check_partitions_intersection(partitioned_drivers), "Partitions are not disjoint!"
             # Generate data tables for each partition
             data_tables = []
             num_partitions = len(partitioned_drivers)

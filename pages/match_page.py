@@ -176,8 +176,8 @@ def display_candidates(ts, data_store):
     Output('unmatch-confirmation-dialog', 'is_open'),
     Output('url-candidates-store', 'data', allow_duplicate=True),
     Output('clicked-unmatch-button-store', 'data'),
-    Output('match-toast', 'is_open', allow_duplicate=True),  # Added output for the toast notification
-    Output('match-toast', 'children', allow_duplicate=True),  # Added output for the toast notification content
+    # Output('match-toast', 'is_open', allow_duplicate=True),  # Added output for the toast notification
+    # Output('match-toast', 'children', allow_duplicate=True),  # Added output for the toast notification content
     [Input({'type': 'unmatch-button', 'candidate_id': ALL, 'driver_id': ALL}, 'n_clicks'), # Card unmatch buttons
      Input('confirm-unmatch', 'n_clicks'), # Dialog Confirm unmatch button
      Input('cancel-unmatch', 'n_clicks')], # Dialog Cancel unmatch button
@@ -203,7 +203,7 @@ def handle_unmatch(unmatch_clicks, confirm_click, cancel_click, is_open, button_
         driver_id = button_info['driver_id']
         # Store these IDs in clicked-unmatch-button-store
         ids_to_store = json.dumps({'candidate_id': candidate_id, 'driver_id': driver_id})
-        return True, dash.no_update, ids_to_store, dash.no_update, dash.no_update
+        return True, dash.no_update, ids_to_store
     elif 'confirm-unmatch' in button_clicked and is_open:
         clicked_unmatch_button = json.loads(clicked_unmatch_button)
         if not clicked_unmatch_button:
@@ -216,9 +216,7 @@ def handle_unmatch(unmatch_clicks, confirm_click, cancel_click, is_open, button_
         data_dict = json.loads(data_store)
         matches = data_dict.get("matches", [])
         # Close the dialog and force page refresh components to reflect the unmatch
-        unmatched_driver_name = [match["name"] for match in matches if match["id"] == driver_id][0]
-        unmatched_info = f"Unmatched driver: {unmatched_driver_name}"
-        return False, json.dumps(add_metadata_to_data(matches)), dash.no_update, True, unmatched_info
+        return False, json.dumps(add_metadata_to_data(matches)), dash.no_update
     elif 'cancel-unmatch' in button_clicked and is_open:
         # Just close the dialog without doing anything
         return False, dash.no_update, dash.no_update  # No update to the store
