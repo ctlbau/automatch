@@ -4,7 +4,7 @@ from dash_deck import DeckGL
 from dash import html, callback, ALL
 import pydeck as pdk
 from utils.geo_utils import geoencode_address, calculate_isochrones, partition_drivers_by_isochrones, extract_coords_from_encompassing_isochrone, check_partitions_intersection
-from db.db_support import fetch_drivers, fetch_shifts, fetch_managers
+from db.automatch import fetch_drivers, fetch_shifts, fetch_managers
 from dash.dependencies import Input, Output, State
 from dash import dcc
 from dash import dash_table, dcc, html

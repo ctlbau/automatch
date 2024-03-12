@@ -1,5 +1,5 @@
 import pandas as pd
-from .db_connect import connect, localauth
+from db.db_connect import connect, localauth
 import json
 
 import pandas as pd
