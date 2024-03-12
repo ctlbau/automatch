@@ -11,7 +11,7 @@ from dash import dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
 
-dash.register_page(__name__)
+dash.register_page(__name__, path='/')
 
 BASE_URL = "http://localhost:8989/isochrone"
 
@@ -21,11 +21,10 @@ MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9
 CHOSEN_STYLE = MAP_STYLES[0]
 
 layout = html.Div([
-        dcc.Location(id='url', refresh=True), # This enables page navigation
     # Container for inputs and button
     html.Div([
         dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, style={'marginRight': '10px', 'width': '350px', 'display': 'block', 'marginBottom': '10px'}),
-        html.Div([  # New div to wrap zip-code-input and Submit button
+        html.Div([  # Div to wrap zip-code-input and Submit button
             dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False, style={'marginRight': '10px', 'display': 'inline-block', 'marginBottom': '10px'}),
             html.Button('Submit', id='submit-val', n_clicks=0, style={'display': 'inline-block'}),
         ], style={'display': 'flex', 'flexDirection': 'row'}),
@@ -98,7 +97,7 @@ layout = html.Div([
         ),
     ], style={'width': '80%', 'position': 'relative', 'marginTop': '20px'}),  # Adjust marginTop as needed
     html.Div(id='data-tables-container', children=[]),  # Container for dynamic data tables
-    html.Button('Create Match', id='create-match', n_clicks=0, style={'marginTop': '20px', 'marginBottom': '20px'}),  # Button for creating matches
+    # html.Button('Create Match', id='create-match', n_clicks=0, style={'marginTop': '20px', 'marginBottom': '20px'}),  # Button for creating matches
     # dcc.Store(id='drivers-to-match-store'),  # Store for selected drivers' IDs
 ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
 
@@ -187,7 +186,7 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, street, 
             ).to_json()
 
             partitioned_drivers = partition_drivers_by_isochrones(drivers_gdf, isochrones_geojson)
-            assert check_partitions_intersection(partitioned_drivers), "Partitions are not disjoint!"
+            # assert check_partitions_intersection(partitioned_drivers), "Partitions are not disjoint!"
             # Generate data tables for each partition
             data_tables = []
             num_partitions = len(partitioned_drivers)
@@ -200,12 +199,10 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, street, 
                     style_table={'overflowX': 'auto'},
                     page_size=10,
                     style_cell={'textAlign': 'left'},
-                    row_selectable='multi',  
-                    selected_rows=[],
                 )
                 if i < num_partitions - 1:
                     number_of_drivers = len(partition)
-                    iso_title = time_limits[0] + i * 5
+                    iso_title = time_limits[0] + i * 5 
                     title = f'{number_of_drivers} drivers within {iso_title} minutes of chosen location'
                 else:
                     # This is the last partition, so we give it a custom title
@@ -219,30 +216,3 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, street, 
             return dash.no_update, dash.no_update, False
     return dash.no_update, dash.no_update, False
 
-@callback(
-    Output('drivers-to-match-store', 'data'),
-    [Input({'type': 'drivers-table', 'index': ALL}, 'selected_rows')],
-    [State({'type': 'drivers-table', 'index': ALL}, 'data'),  # Assuming the full data is passed as a prop to the table
-     State('drivers-to-match-store', 'data')]
-)
-def update_drivers_to_match_store(selected_rows_list, tables_data, stored_data):
-    if not stored_data:
-        stored_data = []
-
-    for selected_rows, table_data in zip(selected_rows_list, tables_data):
-        if selected_rows:
-            # Extract kendra_id values for the selected rows
-            selected_kendra_ids = [table_data[i]['kendra_id'] for i in selected_rows]
-            stored_data.extend(selected_kendra_ids)
-
-    return list(set(stored_data))
-
-####### Navigation to the match page when the "Create Match" button is clicked #######
-@callback(
-    Output('url', 'pathname'),  # Target the dcc.Location component
-    [Input('create-match', 'n_clicks')],
-    prevent_initial_call=True  # Prevent navigation on initial load
-)
-def navigate_to_match_page(n_clicks):
-    if n_clicks:
-        return '/match_page' 

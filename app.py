@@ -13,8 +13,6 @@ app = dash.Dash(
     suppress_callback_exceptions=True
                 )
 
-from pages import deck_page, match_page # Import the pages after app instatiation
-
 app.layout = html.Div([
     dcc.Store(id='drivers-to-match-store'),  # Store here to share data between pages
         html.H1('AutoMatch'),
