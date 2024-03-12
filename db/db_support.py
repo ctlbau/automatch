@@ -26,7 +26,7 @@ def match_drivers_to_vehicle(driver_ids, vehicle_plate):
                         ON DUPLICATE KEY UPDATE vehicle_id = vehicle_id;
                     """, (driver_id, vehicle_id))
 
-                local_conn.commit()  # Commit the changes to the database
+                local_conn.commit()
             else:
                 print("Vehicle with plate", vehicle_plate, "not found.")
 
@@ -132,34 +132,6 @@ def fetch_shifts():
             shifts = pd.DataFrame(shifts, columns=columns)
     return shifts
 
-def fetch_drivers_geojson():
-    with connect(localauth) as local_conn:
-        with local_conn.cursor() as local_cursor:
-            local_cursor.execute("""SELECT
-                                    D.kendra_id,
-                                    D.name AS name,
-                                    D.street,
-                                    D.city,
-                                    D.country,
-                                    D.zip_code,
-                                    D.lat,
-                                    D.lng,
-                                    P.name AS province,
-                                    M.name AS manager,
-                                    S.name AS shift
-                                FROM
-                                    Drivers D
-                                    LEFT JOIN Provinces P ON D.province_id = P.id
-                                    LEFT JOIN Managers M ON D.manager_id = M.id
-                                    LEFT JOIN Shifts S ON D.shift_id = S.id;""")
-            drivers = local_cursor.fetchall()
-            columns = [desc[0] for desc in local_cursor.description]
-            drivers = pd.DataFrame(drivers, columns=columns)
-            drivers = gpd.GeoDataFrame(drivers, geometry=gpd.points_from_xy(drivers.lng, drivers.lat)).set_crs(4326)
-            drivers = drivers.drop(columns=['lat', 'lng'])
-            drivers = json.loads(drivers.to_json())
-    return drivers
-
 def fetch_drivers():
     with connect(localauth) as local_conn:
         with local_conn.cursor() as local_cursor:
@@ -218,30 +190,3 @@ def fetch_vehicle_plates():
             plates = local_cursor.fetchall()
             return [plate[0] for plate in plates]  # Extract plate numbers from the tuples
 
-
-# def fetch_drivers():
-#     query = """
-#     SELECT 
-#         D.kendra_id,
-#         D.name AS driver_name,
-#         D.street,
-#         D.city,
-#         D.country,
-#         D.zip_code,
-#         D.lat,
-#         D.lng,
-#         P.name AS province_name,
-#         M.name AS manager_name,
-#         S.name AS shift_name
-#     FROM Drivers D
-#     LEFT JOIN Provinces P ON D.province_id = P.id
-#     LEFT JOIN Managers M ON D.manager_id = M.id
-#     LEFT JOIN Shifts S ON D.shift_id = S.id;
-#     """
-#     with connect(localauth) as local_conn:
-#         with local_conn.cursor() as local_cursor:
-#             local_cursor.execute(query)
-#             drivers = local_cursor.fetchall()
-#             columns = [desc[0] for desc in local_cursor.description]
-#             drivers = pd.DataFrame(drivers, columns=columns)
-#     return drivers
