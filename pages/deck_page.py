@@ -52,7 +52,7 @@ layout = html.Div([
             multi=True,
             style={'marginBottom': '10px'}
         ),
-    ], style={'padding': '20px', 'maxWidth': '600px'}),
+    ], className="col-md-3 offset-md-0 col-12"),
     
     # Alert for failed geoencoding
     dbc.Alert(

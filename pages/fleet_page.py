@@ -7,17 +7,16 @@ import dash_bootstrap_components as dbc
 from db.fleetpulse.db_support import *
 from ui.components import *
 import json
-from io import StringIO
 
 dash.register_page(__name__, path='/fleet')
 
 ######## Begin Layout ##########
 layout = html.Div([
-    create_navbar('Fleet Pulse'),
+    # create_navbar('Fleet Pulse'),
     dcc.Tabs(id="tabs", value='manager-tab', children=[
         dcc.Tab(label='Manager View', value='manager-tab'),
         dcc.Tab(label='Vehicle view', value='vehicle-tab'),
-    ]),
+    ], className="col-md-2 offset-md-1 col-12"),
     html.Div(id='tabs-content'),
 ])
 ######## End Layout ############
@@ -38,7 +37,7 @@ def render_ui(tab):
             create_status_filter('status-dropdown'),
             create_date_range_picker('date-picker-range'),
             create_navbar_options('count-proportion-radio'),
-            html.Div(id='manager-view-graph-and-table-container'),
+            html.Div(id='manager-view-graph-and-table-container', className="col-md-9 offset-md-2 col-12"),
             create_modal('details-modal-all', 'details-modal-title-all', 'modal-content-all', 'modal-footer-all'),
             create_modal('details-modal-part', 'details-modal-title-part', 'modal-content-part', 'modal-footer-part'),
         ]
@@ -46,7 +45,7 @@ def render_ui(tab):
         return [
             create_plate_filter('plate-dropdown'),
             create_date_range_picker('date-picker-range'),
-            html.Div(id='vehicle-view-graph-container')
+            html.Div(id='vehicle-view-graph-container', className="col-md-9 offset-md-2 col-12")
         ]
 ########## End Render UI ###########
 

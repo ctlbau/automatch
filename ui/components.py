@@ -37,7 +37,7 @@ def create_company_filter(id):
                             value='all',
                             clearable=False,
                             placeholder="Select company"
-                        ), className="d-inline-block w-100"
+                        ), className="col-md-4 offset-md-4 col-12"
                     )
                 ]
             )
@@ -59,7 +59,7 @@ def create_status_filter(id):
                             multi=True,
                             clearable=True,
                             placeholder="Select statuses"
-                        ), className="d-inline-block w-100"
+                        ), className="col-md-4 offset-md-4 col-12"
                     )
                 ]
             )
@@ -81,7 +81,7 @@ def create_plate_filter(id):
                             multi=False,
                             clearable=True,
                             placeholder="Select plates"
-                        ), className="d-inline-block w-100"
+                        ), className="col-md-4 offset-md-4 col-12"
                     )
                 ]
             )
@@ -106,7 +106,7 @@ def create_date_range_picker(id):
                             min_date_allowed=min_date,
                             max_date_allowed=max_date,
                             display_format='D MMM YY',
-                        ), className="d-inline-block w-100"
+                        ), className="col-md-4 offset-md-4 col-12"
                     )
                 ]
             )
@@ -128,7 +128,7 @@ manager_filter = html.Nav(
                         multi=False,
                         clearable=True,
                         placeholder="Select managers"
-                    ), className="d-inline-block w-100"
+                    ), className="col-md-4 offset-md-4 col-12"
                 )
             ]
         )
@@ -152,7 +152,7 @@ def create_navbar_options(count_or_proportion_id):
                             ],
                             value='count',
                             inline=True
-                        ), className="d-inline-block me-2"
+                        ), className="col-md-4 offset-md-4 col-12"
                     )
                 ]
             )
