@@ -1,4 +1,4 @@
-from db_connect import connect, localauth, kndauth
+from db.db_connect import connect, localauth, kndauth
 
 def fetch_and_insert_shift_data(kndauth, localauth):
     select_query = """SELECT s.id AS shift_id, s.name AS name FROM shift s ORDER BY s.id;"""

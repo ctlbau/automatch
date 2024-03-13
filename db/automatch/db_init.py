@@ -1,4 +1,4 @@
-from db_connect import *
+from db.db_connect import *
 
 def connect(auth):
     while True:
