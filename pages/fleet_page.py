@@ -13,7 +13,7 @@ dash.register_page(__name__, path='/fleet')
 
 ######## Begin Layout ##########
 layout = html.Div([
-    navbar_title,
+    create_navbar('Fleet Pulse'),
     dcc.Tabs(id="tabs", value='manager-tab', children=[
         dcc.Tab(label='Manager View', value='manager-tab'),
         dcc.Tab(label='Vehicle view', value='vehicle-tab'),

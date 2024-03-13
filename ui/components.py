@@ -5,17 +5,18 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 
-navbar_title = html.Nav(
-    className="navbar navbar-expand-lg navbar-dark bg-dark mb-2",
-    children=[
-        html.Div(
-            className="container-fluid",
-            children=[
-                html.Span("Vehicle Status Dashboard", className="navbar-brand")
-            ]
-        )
-    ]
-)
+def create_navbar(title):
+    return html.Nav(
+        className="navbar navbar-expand-lg navbar-dark bg-dark mb-2",
+        children=[
+            html.Div(
+                className="container-fluid d-flex justify-content-center",
+                children=[
+                    html.Span(html.Strong(title), className="navbar-brand text-center")
+                ]
+            )
+        ]
+    )
 
 def create_company_filter(id):
     return html.Nav(

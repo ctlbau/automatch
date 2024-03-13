@@ -10,6 +10,7 @@ from dash import dcc
 from dash import dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
+from ui.components import create_navbar
 
 dash.register_page(__name__, path='/')
 
