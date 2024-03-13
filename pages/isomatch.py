@@ -12,7 +12,7 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
 from ui.components import create_navbar
 
-dash.register_page(__name__, path='/')
+dash.register_page(__name__, path='/isomatch')
 
 BASE_URL = "http://localhost:8989/isochrone"
 
@@ -52,6 +52,20 @@ layout = html.Div([
             multi=True,
             style={'marginBottom': '10px'}
         ),
+        html.Div([  # Div for radio items to display horizontally
+            html.Label('Filter by Match Status:', style={'marginRight': '20px', 'marginBottom': '10px'}),
+            dcc.RadioItems(  # Radio button for is_matched filter
+                id='is-matched-radio',
+                options=[
+                    {'label': 'All', 'value': 'all'},
+                    {'label': 'True', 'value': 'true'},
+                    {'label': 'False', 'value': 'false'},
+                ],
+                value='all',
+                labelStyle={'display': 'inline-block', 'marginRight': '20px'},  # Adjusted for horizontal display
+                style={'marginBottom': '10px'}
+            ),
+        ], style={'display': 'flex', 'flexDirection': 'row', 'alignItems': 'center'}),
     ], className="col-md-3 offset-md-0 col-12"),
     
     # Alert for failed geoencoding
@@ -104,12 +118,12 @@ layout = html.Div([
 
 @callback(
     [Output('map', 'data'), Output('data-tables-container', 'children'), Output('alert-fail-geoencode', 'is_open')],
-    [Input('submit-val', 'n_clicks'), Input('shifts-dropdown', 'value'), Input('managers-dropdown', 'value')],
+    [Input('submit-val', 'n_clicks'), Input('shifts-dropdown', 'value'), Input('managers-dropdown', 'value'), Input('is-matched-radio', 'value')],
     [State('street-input', 'value'),
      State('zip-code-input', 'value'),
      State('time-limit-range-slider', 'value')]
 )
-def update_map_and_tables(n_clicks, selected_shifts, selected_managers, street, zip_code, time_limits):
+def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_matched_filter, street, zip_code, time_limits):
     if n_clicks > 0:
         geoencode_result = geoencode_address(street, zip_code)
         
@@ -132,6 +146,12 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, street, 
             if selected_managers:
                 drivers_list = [driver for driver in drivers_list if driver['manager'] in selected_managers]
                 drivers_gdf = drivers_gdf[drivers_gdf['manager'].isin(selected_managers)]
+
+            # Apply is_matched filter
+            if is_matched_filter != 'all':
+                is_matched_value = True if is_matched_filter == 'true' else False
+                drivers_list = [driver for driver in drivers_list if driver['is_matched'] == is_matched_value]
+                drivers_gdf = drivers_gdf[drivers_gdf['is_matched'] == is_matched_value]
 
             # Define icon data
             icon_data = {
@@ -216,4 +236,3 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, street, 
             # No clicks yet, do not update anything and ensure the alert is closed
             return dash.no_update, dash.no_update, False
     return dash.no_update, dash.no_update, False
-

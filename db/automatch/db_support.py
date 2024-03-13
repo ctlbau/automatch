@@ -90,7 +90,8 @@ def fetch_drivers():
                     "name": driver["name"],
                     "street": driver["street"],
                     "manager": driver["manager"],
-                    "shift": driver["shift"]
+                    "shift": driver["shift"],
+                    "is_matched": driver["is_matched"]
                 } for index, driver in drivers_gdf.iterrows()
             ]
             
