@@ -6,9 +6,7 @@ def fetch_and_insert_managers(kndauth, localauth):
                         CONCAT(e2.first_name, ' ', e2.last_name) AS name
                     FROM
                         employee e
-                        INNER JOIN employee e2 ON e2.id = e.fleet_manager_id
-
-                        
+                        INNER JOIN employee e2 ON e2.id = e.fleet_manager_id                        
                     WHERE
                         e.geolocation_latitude IS NOT NULL
                         AND e.geolocation_longitude IS NOT NULL

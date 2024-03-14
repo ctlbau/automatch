@@ -1,34 +1,42 @@
-import pymysql
-from time import sleep
+from sqlalchemy.exc import OperationalError, DBAPIError
+from sqlalchemy import create_engine
+# import pymysql
+# from time import sleep
 import os
 
 kndauth = {
-    "host" : os.environ['KND_HOST'],
-    "user" : os.environ['KND_USER'],
-    "password" : os.environ['KND_PASSWORD'],
-    "database" : os.environ['KND_NAME']
-    }
+    "dialect": "mysql+pymysql",
+    "username": os.environ['KND_USER'],
+    "password": os.environ['KND_PASSWORD'],
+    "host": os.environ['KND_HOST'],
+    "dbname": os.environ['KND_NAME']
+}
 
 localauth = {
-    "host": "localhost",
-    "user": "root",
+    "dialect": "mysql+pymysql",
+    "username": "root",
     "password": os.environ['MYSQL_ROOT_PWD'],
-    "database": "autopulse"
+    "host": "localhost",
+    "dbname": "autopulse"
 }
 
 def connect(auth):
-    while True:
-        try:
-            return pymysql.connect(
-                host=auth['host'],
-                user=auth['user'],
-                password=auth['password'],
-                database=auth.get('database', None),
-                # autocommit=True
-            )
-        except pymysql.MySQLError as e:
-            print(f"Failed to connect to MySQL: {e}")
-            sleep(1)
+    try:
+        db_url = f"{auth['dialect']}://{auth['username']}:{auth['password']}@{auth['host']}/{auth['dbname']}"
+        engine = create_engine(db_url)
+        # Attempt to connect to the database to validate connection parameters
+        with engine.connect() as conn:
+            pass  # Connection successful
+        return engine
+    except OperationalError as e:
+        print(f"OperationalError: Could not connect to the database. {e}")
+    except DBAPIError as e:
+        print(f"DBAPIError: An error occurred with the database driver. {e}")
+    except ImportError as e:
+        print(f"ImportError: The database driver specified in the dialect is not installed. {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+    return None
 
 auroids = [5, 53, 56, 57, 59, 64, 123, 131, 132, 229, 234, 248, 62, 535]
 
