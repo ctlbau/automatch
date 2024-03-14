@@ -35,7 +35,7 @@ sidebar_title = html.H2("AuroPulse", className="display-4")
 nav_links = [
     dbc.NavLink(
         [
-            html.Div(page["name"], className="ms2")
+            html.Div(page["name"], className="ms-2")
         ],
         href=page["path"],
         active="exact",
@@ -56,7 +56,7 @@ sidebar = dbc.Nav(
 )
 
 app.layout = dbc.Container([
-    html.Hr(),
+    html.Br(),
     dbc.Row(
         [
             dbc.Col(
