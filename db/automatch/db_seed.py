@@ -1,5 +1,36 @@
 from db.db_connect import connect, localauth, kndauth
 
+def fetch_and_insert_managers(kndauth, localauth):
+    select_query = """SELECT
+                        e2.id as kendra_id,
+                        CONCAT(e2.first_name, ' ', e2.last_name) AS name
+                    FROM
+                        employee e
+                        INNER JOIN employee e2 ON e2.id = e.fleet_manager_id
+
+                        
+                    WHERE
+                        e.geolocation_latitude IS NOT NULL
+                        AND e.geolocation_longitude IS NOT NULL
+                        AND e.status = 'active'
+                        AND e.position_id in(6, 30)
+                    GROUP BY
+                        e2.id
+                    ORDER BY 
+                        e2.id;"""
+    insert_query = """INSERT IGNORE INTO Managers (id, name) VALUES (%s, %s);"""
+
+    with connect(kndauth) as knd_conn:
+        with knd_conn.cursor() as knd_cursor:
+            knd_cursor.execute(select_query)
+            managers = knd_cursor.fetchall()
+    
+    with connect(localauth) as local_conn:
+        with local_conn.cursor() as local_cursor:
+            local_cursor.executemany(insert_query, managers)
+            local_conn.commit()
+            print("Managers data inserted successfully")
+
 def fetch_and_insert_shift_data(kndauth, localauth):
     select_query = """SELECT s.id AS shift_id, s.name AS name FROM shift s ORDER BY s.id;"""
     insert_query = """INSERT IGNORE INTO Shifts (id, name) VALUES (%s, %s);"""
@@ -42,7 +73,7 @@ def fetch_and_insert_drivers(kndauth, localauth):
         e.geolocation_latitude AS lat,
         e.geolocation_longitude AS lng,
         a.province_id AS province_id,
-        e2.fleet_manager_id AS manager_id,
+        e.fleet_manager_id AS manager_id,
         s.id as shift_id
     FROM
         employee e
@@ -127,6 +158,7 @@ def fetch_and_insert_drivers_vehicles(kndauth, localauth):
             print("DriversVehicles data inserted successfully")
 
 if __name__ == "__main__":
+    fetch_and_insert_managers(kndauth, localauth)
     fetch_and_insert_shift_data(kndauth, localauth)
     fetch_and_insert_provinces(kndauth, localauth)
     fetch_and_insert_drivers(kndauth, localauth)

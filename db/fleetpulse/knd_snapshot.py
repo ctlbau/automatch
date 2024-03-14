@@ -71,28 +71,52 @@ def ensure_centers_exist(df):
         con.commit()
 
 def delete_absent_managers():
-    # Connect to kndauth database to fetch manager IDs
     with connect(kndauth) as con_knd, con_knd.cursor() as cursor_knd:
-        cursor_knd.execute("SELECT DISTINCT employee.id FROM vehicle INNER JOIN vehicle_group ON vehicle.vehicle_group_id = vehicle_group.id INNER JOIN employee ON vehicle_group.fleet_manager_id = employee.id")
+        cursor_knd.execute("""SELECT
+                                e2.id as id
+                            FROM
+                                employee e
+                            INNER JOIN 
+                                employee e2 ON e2.id = e.fleet_manager_id
+                            WHERE
+                                e.geolocation_latitude IS NOT NULL
+                                AND e.geolocation_longitude IS NOT NULL
+                                AND e.status = 'active'
+                                AND e.position_id in(6, 30)
+                            GROUP BY
+                                e2.id
+                            ORDER BY
+                                e2.id;""")
         knd_manager_ids = set([row[0] for row in cursor_knd.fetchall()])
 
-    # Connect to localauth database to fetch manager IDs
     with connect(localauth) as con_local, con_local.cursor() as cursor_local:
         cursor_local.execute("SELECT id FROM Managers")
         local_manager_ids = set([row[0] for row in cursor_local.fetchall()])
 
-    # Find manager IDs that are in localauth but not in kndauth
-    managers_to_delete = local_manager_ids - knd_manager_ids
+        managers_to_delete = local_manager_ids - knd_manager_ids
+        purged_managers_count = 0
 
-    # Delete these managers from localauth
-    with connect(localauth) as con_local, con_local.cursor() as cursor_local:
         for manager_id in managers_to_delete:
-            delete_query = "DELETE FROM Managers WHERE id = %s"
-            cursor_local.execute(delete_query, (manager_id,))
-    
-        con_local.commit()
+            # with con_local.cursor() as cursor_local:
+                # Check for dependencies in the Vehicles table
+                cursor_local.execute("SELECT COUNT(*) FROM Vehicles WHERE manager_id = %s", (manager_id,))
+                vehicles_count = cursor_local.fetchone()[0]
 
-    print(f"Deleted {len(managers_to_delete)} absent managers from local database.")
+                # Check for dependencies in the Drivers table
+                cursor_local.execute("SELECT COUNT(*) FROM Drivers WHERE manager_id = %s", (manager_id,))
+                drivers_count = cursor_local.fetchone()[0]
+
+                if vehicles_count == 0 and drivers_count == 0:
+                # If no dependencies are found in either table, it's safe to delete the manager
+                    delete_query = "DELETE FROM Managers WHERE id = %s"
+                    cursor_local.execute(delete_query, (manager_id,))
+                    purged_managers_count += 1  # Increment counter
+                else:
+                # Dependencies exist, so we skip deleting this manager
+                    print(f"Skipping deletion of manager {manager_id} due to existing dependencies in Vehicles or Drivers tables.")
+                con_local.commit()
+
+        print(f"Completed checking and deleting absent managers from local database. Total managers purged: {purged_managers_count}.")
 
 def insert_vehicle_data(df):
     with connect(localauth) as con, con.cursor() as cursor:
@@ -132,7 +156,7 @@ def insert_vehicle_data(df):
 if __name__ == "__main__":
     df, manager_df = get_vehicle_stati()
     ensure_managers_exist(manager_df)
-    # delete_absent_managers()
+    delete_absent_managers()
     ensure_companies_exist(df)
     ensure_centers_exist(df)
     insert_vehicle_data(df)
