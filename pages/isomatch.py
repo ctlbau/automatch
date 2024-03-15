@@ -12,7 +12,7 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
 from ui.components import create_navbar
 
-dash.register_page(__name__, path='/isomatch')
+dash.register_page(__name__, path='/')
 
 BASE_URL = "http://localhost:8989/isochrone"
 

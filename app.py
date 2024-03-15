@@ -3,7 +3,13 @@ import dash_bootstrap_components as dbc
 from dash import dcc, html
 from dash.dependencies import Input, Output
 from ui.components import create_navbar
+import dash_auth
+from dotenv import load_dotenv
+import os
+import json
 # Import your page layouts and callbacks
+load_dotenv('.env')
+users = json.loads(os.getenv("USERS"))
 
 # Choose a theme from https://bootswatch.com/ or use the default Bootstrap theme
 app = dash.Dash(
@@ -12,6 +18,14 @@ app = dash.Dash(
     use_pages=True,
     suppress_callback_exceptions=True
                 )
+
+server = app.server
+
+auth = dash_auth.BasicAuth(
+    app,
+    users
+)
+
 
 # styling the sidebar
 SIDEBAR_STYLE = {
