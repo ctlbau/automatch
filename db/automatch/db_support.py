@@ -46,26 +46,49 @@ def fetch_drivers_geojson():
 def fetch_drivers():
     engine = connect(localauth)
     query = text("""SELECT
-                        D.kendra_id,
-                        D.name AS name,
-                        D.street,
-                        D.city,
-                        D.country,
-                        D.zip_code,
-                        D.lat,
-                        D.lng,
-                        P.name AS province,
-                        M.name AS manager,
-                        S.name AS shift,
-                        MAX(CASE WHEN DV.driver_id IS NOT NULL THEN TRUE ELSE FALSE END) AS is_matched
-                    FROM
-                        Drivers D
-                        LEFT JOIN Provinces P ON D.province_id = P.id
-                        LEFT JOIN Managers M ON D.manager_id = M.id
-                        LEFT JOIN Shifts S ON D.shift_id = S.id
-                        LEFT JOIN DriversVehicles DV ON D.kendra_id = DV.driver_id
+                        match1.driver_id,
+                        match1.driver_name,
+                        match1.street,
+                        match1.lat,
+                        match1.lng,
+                        match1.vehicle_id,
+                        match1.manager,
+                        match1.shift,
+                        match1.center,
+                        IF(COUNT(DISTINCT match2.driver_id) > 0, 1, 0) AS is_matched,
+                        GROUP_CONCAT(DISTINCT match2.name ORDER BY match2.name SEPARATOR ', ') AS matched_with
+                    FROM (
+                        SELECT
+                            D.kendra_id AS driver_id,
+                            D.name AS driver_name,
+                            D.street,
+                            D.lat,
+                            D.lng,
+                            DV.vehicle_id,
+                            M.name AS manager,
+                            S.name AS shift,
+                            C.name AS center
+                        FROM
+                            Drivers D
+                            JOIN DriversVehicles DV ON D.kendra_id = DV.driver_id
+                            JOIN Vehicles V ON DV.vehicle_id = V.kendra_id
+                            JOIN Managers M ON D.manager_id = M.id
+                            JOIN Shifts S ON D.shift_id = S.id
+                            JOIN Centers C ON V.center_id = C.id
+                    ) AS match1
+                    LEFT JOIN (
+                        SELECT
+                            D.kendra_id AS driver_id,
+                            D.name,
+                            DV.vehicle_id
+                        FROM
+                            Drivers D
+                            JOIN DriversVehicles DV ON D.kendra_id = DV.driver_id
+                    ) AS match2 ON match1.vehicle_id = match2.vehicle_id AND match1.driver_id != match2.driver_id
                     GROUP BY
-                        D.kendra_id, D.name, D.street, D.city, D.country, D.zip_code, D.lat, D.lng, P.name, M.name, S.name;""")
+                        match1.driver_id, match1.driver_name, match1.street, match1.lat, match1.lng, match1.vehicle_id, match1.manager, match1.shift, match1.center
+                    ORDER BY
+                        match1.driver_id;""")
     drivers_df = pd.read_sql(query, engine)
     drivers_gdf = gpd.GeoDataFrame(drivers_df, geometry=gpd.points_from_xy(drivers_df.lng, drivers_df.lat)).set_crs(epsg=4326)
     drivers_list_dict = [
@@ -73,11 +96,13 @@ def fetch_drivers():
             "coordinates": [driver.geometry.x, driver.geometry.y],
             "color": [255, 0, 0, 255],  # Example color: red
             "radius": 50,  # Example radius
-            "name": driver["name"],
+            "name": driver["driver_name"],
             "street": driver["street"],
             "manager": driver["manager"],
             "shift": driver["shift"],
-            "is_matched": driver["is_matched"]
+            "center": driver["center"],
+            "is_matched": driver["is_matched"],
+            "matched_with": driver["matched_with"],
         } for index, driver in drivers_gdf.iterrows()
     ]
     return drivers_df, drivers_gdf, drivers_list_dict

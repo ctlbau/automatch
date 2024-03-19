@@ -98,7 +98,7 @@ layout = html.Div([
                         ).to_json(),
                         mapboxKey=MAPBOX_API_KEY,
                         tooltip={
-                            "html": "<b>Name:</b> {name}<br><b>Street:</b> {street}<br><b>Manager:</b> {manager}<br><b>Shift:</b> {shift}",
+                            "html": "<b>Name:</b> {name}<br><b>Street:</b> {street}<br><b>Manager:</b> {manager}<br><b>Shift:</b> {shift} <br> <b>Center:</b> {center}",
                             "style": {
                                 "backgroundColor": "steelblue",
                                 "color": "white"
@@ -139,6 +139,7 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
             isochrone_coords = extract_coords_from_encompassing_isochrone(isochrones_geojson)
             computed_view_state = pdk.data_utils.compute_view(isochrone_coords, view_proportion=0.9)
             drivers_df, drivers_gdf, drivers_list = fetch_drivers()
+            
             if selected_shifts:
                 drivers_list = [driver for driver in drivers_list if driver['shift'] in selected_shifts]
                 drivers_gdf = drivers_gdf[drivers_gdf['shift'].isin(selected_shifts)]
@@ -147,7 +148,6 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
                 drivers_list = [driver for driver in drivers_list if driver['manager'] in selected_managers]
                 drivers_gdf = drivers_gdf[drivers_gdf['manager'].isin(selected_managers)]
 
-            # Apply is_matched filter
             if is_matched_filter != 'all':
                 is_matched_value = True if is_matched_filter == 'true' else False
                 drivers_list = [driver for driver in drivers_list if driver['is_matched'] == is_matched_value]
@@ -192,18 +192,12 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
                 auto_highlight=True,
             )
             initial_view_state = computed_view_state
+            print(drivers_list)
 
             new_deck_data = pdk.Deck(
-                layers=[isochrone_layer, drivers_layer, icon_layer],  # Add the icon_layer here
+                layers=[isochrone_layer, drivers_layer, icon_layer],
                 initial_view_state=initial_view_state,
-                map_style=CHOSEN_STYLE,
-                tooltip={
-                    "html": "<b>Name:</b> {name}<br><b>Street:</b> {street}<br><b>Manager:</b> {manager}<br><b>Shift:</b> {shift}",
-                    "style": {
-                        "backgroundColor": "steelblue",
-                        "color": "white"
-                    }
-                }
+                map_style=CHOSEN_STYLE
             ).to_json()
 
             partitioned_drivers = partition_drivers_by_isochrones(drivers_gdf, isochrones_geojson)
@@ -212,7 +206,7 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
             data_tables = []
             num_partitions = len(partitioned_drivers)
             for i, partition in enumerate(partitioned_drivers):
-                partition = partition.drop(columns=['geometry', 'lat', 'lng', 'zip_code', 'province', 'city', 'country'])
+                partition = partition.drop(columns=['geometry', 'lat', 'lng'])
                 table = create_data_table({'type': 'drivers-table', 'index': i}, partition, page_size=10)
                 if i < num_partitions - 1:
                     number_of_drivers = len(partition)
