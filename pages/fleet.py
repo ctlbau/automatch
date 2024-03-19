@@ -101,6 +101,8 @@ def update_managerview_table_and_graph(tab, start_date, end_date, selected_compa
             base_df = base_df[base_df['status'].isin(selected_statuses)]
         manager_agg_df = calculate_aggregations(base_df, ['date', 'status'])
         manager_pivot_df = manager_agg_df.pivot(index='status', columns='date', values=count_proportion_radio).reset_index().fillna(0)
+        total_unique_per_status = manager_agg_df[['status', 'total_unique']].drop_duplicates()
+        manager_pivot_df = manager_pivot_df.merge(total_unique_per_status, on='status', how='left')
         manager_pivot_df.columns = manager_pivot_df.columns.astype(str)
 
         table = create_data_table('main-table-part', manager_pivot_df, table_page_size)
@@ -165,31 +167,43 @@ def update_modal_all(active_cell, companies, start_date, end_date, selected_stat
         agg_df = calculate_aggregations(base_df, ['date', 'status'])
 
     pivot_df = agg_df.pivot(index='status', columns='date', values='count').reset_index().fillna(0)
+    total_unique_per_status = agg_df[['status', 'total_unique']].drop_duplicates()
+    pivot_df = pivot_df.merge(total_unique_per_status, on='status', how='left')
 
-    date_str = active_cell['column_id'] # active_cell['column_id'] gives the date or 'status' as a string of pivot_df
+    column_id = active_cell['column_id']
 
-    # Ensure this is not the 'status' column
-    if date_str != 'status':
-        # Convert the date string to a datetime.date object for comparison
-        date = pd.to_datetime(date_str).date()
+    if column_id == 'total_unique':
+        # Handle clicks on 'total_unique' cell
         status = pivot_df.iloc[active_cell['row']]['status']
-        # Filter base_df for the selected date
+        # Filter base_df for the selected status, ignoring specific date
+        filtered_df = base_df[base_df['status'] == status].copy()
+        
+        # Aggregating detailed data for the status
+        streaks_df = calculate_status_periods(filtered_df)
+        
+        modal_title = f"Overview of {status} vehicles from {start_date} to {end_date}"
+        table = create_data_table(f'modal-content-all-overview-{status}', streaks_df, 10)
+
+        return True, modal_title, table
+
+    elif column_id != 'status':
+        # Handle clicks on date cells
+        date = pd.to_datetime(column_id).date()
+        status = pivot_df.iloc[active_cell['row']]['status']
         filtered_df = filter_and_format(base_df, date, status)
 
-        # If filtered_df is empty, return no data message
         if filtered_df.empty:
             return False, "", []
 
-        streaks_df = calculate_status_periods(base_df)
-        merged_df = pd.merge(filtered_df, streaks_df, on='plate', how='left')
-
-        table = create_data_table(f'modal-content-all-{date_str}-{status}', merged_df, 10)
+        table = create_data_table(f'modal-content-all-{column_id}-{status}', filtered_df, 10)
         modal_title = f"Found {len(filtered_df)} {status} vehicles on {date.strftime('%Y-%m-%d')}"
 
         return True, modal_title, table
+
     else:
-        # If the 'status' column was selected, do not open modal
+        # Clicked on the 'status' column or other non-relevant column
         return False, "", []
+
 
 @callback(
     Output('details-modal-part', 'is_open'),
@@ -222,28 +236,42 @@ def update_modal_part(active_cell, companies, start_date, end_date, selected_man
     agg_df = calculate_aggregations(base_df, ['date', 'status'])
 
     pivot_df = agg_df.pivot(index='status', columns='date', values='count').reset_index().fillna(0)
+    total_unique_per_status = agg_df[['status', 'total_unique']].drop_duplicates()
+    pivot_df = pivot_df.merge(total_unique_per_status, on='status', how='left')
     # active_cell['column_id'] gives the date as a string directly
-    date_str = active_cell['column_id']
-    # Ensure this is not the 'status' column
-    if date_str != 'status':
-        # Convert the date string to a datetime.date object for comparison
-        date = pd.to_datetime(date_str).date()
+    column_id = active_cell['column_id']
+
+    if column_id == 'total_unique':
+        # Handle clicks on 'total_unique' cell
         status = pivot_df.iloc[active_cell['row']]['status']
-        # Filter base_df for the selected date and status
+        # Filter base_df for the selected status, ignoring specific date
+        filtered_df = base_df[base_df['status'] == status].copy()
+        
+        # Aggregating detailed data for the status
+        streaks_df = calculate_status_periods(filtered_df)
+        
+        modal_title = f"Overview of {status} vehicles from {start_date} to {end_date}"
+        table = create_data_table(f'modal-content-all-overview-{status}', streaks_df, 10)
+
+        return True, modal_title, table
+
+    elif column_id != 'status':
+        # Handle clicks on date cells
+        date = pd.to_datetime(column_id).date()
+        status = pivot_df.iloc[active_cell['row']]['status']
         filtered_df = filter_and_format(base_df, date, status)
 
         if filtered_df.empty:
             return False, "", []
 
-        streaks_df = calculate_status_periods(base_df)
-        merged_df = pd.merge(filtered_df, streaks_df, on='plate', how='left')
-        table = create_data_table(f'modal-content-part-{date_str}-{status}', merged_df, 10)
+        table = create_data_table(f'modal-content-all-{column_id}-{status}', filtered_df, 10)
         modal_title = f"Found {len(filtered_df)} {status} vehicles on {date.strftime('%Y-%m-%d')}"
 
         return True, modal_title, table
+
     else:
-        # If the 'status' column was selected, handle accordingly
-        return False, "", "Please select a date column to view details."
+        # Clicked on the 'status' column or other non-relevant column
+        return False, "", []
 
 
 # Perform the sanity check if count-proportion-radio is set to 'count'
