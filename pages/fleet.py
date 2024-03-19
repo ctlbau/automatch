@@ -7,6 +7,7 @@ import dash_bootstrap_components as dbc
 from db.fleetpulse.db_support import *
 from ui.components import *
 import json
+from utils.agg_utils import calculate_aggregations, calculate_status_periods, filter_and_format, sanity_check
 
 dash.register_page(__name__, path='/fleet')
 
@@ -48,6 +49,92 @@ def render_ui(tab):
             html.Div(id='vehicle-view-graph-container', className="col-md-9 offset-md-2 col-12")
         ]
 ########## End Render UI ###########
+
+@callback(
+    Output('manager-view-graph-and-table-container', 'children'),
+    [
+        Input('tabs', 'value'),
+        Input('date-picker-range', 'start_date'),
+        Input('date-picker-range', 'end_date'),
+        Input('company-dropdown', 'value'),
+        Input('manager-dropdown', 'value'),
+        Input('status-dropdown', 'value'),
+        Input('count-proportion-radio', 'value'),
+    ],
+    [State('status-dropdown', 'options')]
+)
+def update_managerview_table_and_graph(tab, start_date, end_date, selected_company, selected_manager, selected_statuses, count_proportion_radio, status_options):
+    if tab != 'manager-tab':
+        return dash.no_update
+
+    base_df = fetch_vehicles(company=selected_company, from_date=start_date, to_date=end_date)
+    agg_df = calculate_aggregations(base_df, ['date', 'status'])
+    table_page_size = len(selected_statuses) if selected_statuses else len(status_options)
+
+    if 'all' == selected_manager:
+
+        if selected_statuses:
+            base_df = base_df[base_df['status'].isin(selected_statuses)]
+            agg_df = agg_df[agg_df['status'].isin(selected_statuses)]
+
+        pivot_df = agg_df.pivot(index='status', columns='date', values=count_proportion_radio).reset_index().fillna(0)
+        total_unique_per_status = agg_df[['status', 'total_unique']].drop_duplicates()
+        pivot_df = pivot_df.merge(total_unique_per_status, on='status', how='left')
+        pivot_df.columns = pivot_df.columns.astype(str)
+        pivot_columns = pivot_df.columns[1:]
+        for col in pivot_columns:
+            pivot_df[col] = pivot_df[col].apply(lambda x: round(x, 3))
+
+        table = create_data_table('main-table-all', pivot_df, table_page_size)
+        fig = create_line_graph(agg_df, count_proportion_radio) # There is also an option for a grouped bar graph
+
+        return [fig, table]
+
+    else:
+
+        if selected_manager:
+            base_df = base_df[base_df['manager'] == selected_manager]
+        else:
+            return dash.no_update
+
+        if selected_statuses:
+            base_df = base_df[base_df['status'].isin(selected_statuses)]
+        manager_agg_df = calculate_aggregations(base_df, ['date', 'status'])
+        manager_pivot_df = manager_agg_df.pivot(index='status', columns='date', values=count_proportion_radio).reset_index().fillna(0)
+        manager_pivot_df.columns = manager_pivot_df.columns.astype(str)
+
+        table = create_data_table('main-table-part', manager_pivot_df, table_page_size)
+        fig = create_line_graph(manager_agg_df, count_proportion_radio)
+
+        return [fig, table]
+
+
+
+@callback(
+    Output('vehicle-view-graph-container', 'children'),
+    [
+        Input('tabs', 'value'),
+        Input('plate-dropdown', 'value'),
+        Input('date-picker-range', 'start_date'),
+        Input('date-picker-range', 'end_date')
+    ]
+)
+def update_vehicle_view(tab, selected_plate, start_date, end_date):
+    if tab != 'vehicle-tab':
+        return dash.no_update
+
+    df = select_plate(
+        plate=selected_plate,
+        from_date=start_date,
+        to_date=end_date
+    )
+
+    # Create a line graph showing the status of the vehicle over time
+    fig = px.line(df, x='date', y='status', title='Vehicle Status Over Time', markers=True)
+    fig.update_layout(height=400, xaxis_tickangle=-45)
+    fig.update_xaxes(tickformat="%Y-%m-%d")
+
+    return dbc.Row([dbc.Col(dcc.Graph(figure=fig), width=12)])
 
 
 @callback(
@@ -159,156 +246,6 @@ def update_modal_part(active_cell, companies, start_date, end_date, selected_man
         return False, "", "Please select a date column to view details."
 
 
-@callback(
-    Output('manager-view-graph-and-table-container', 'children'),
-    [
-        Input('tabs', 'value'),
-        Input('date-picker-range', 'start_date'),
-        Input('date-picker-range', 'end_date'),
-        Input('company-dropdown', 'value'),
-        Input('manager-dropdown', 'value'),
-        Input('status-dropdown', 'value'),
-        Input('count-proportion-radio', 'value'),
-    ],
-    [State('status-dropdown', 'options')]
-)
-def update_managerview_table_and_graph(tab, start_date, end_date, selected_company, selected_manager, selected_statuses, count_proportion_radio, status_options):
-    if tab != 'manager-tab':
-        return dash.no_update
-
-    base_df = fetch_vehicles(company=selected_company, from_date=start_date, to_date=end_date)
-    agg_df = calculate_aggregations(base_df, ['date', 'status'])
-    table_page_size = len(selected_statuses) if selected_statuses else len(status_options)
-
-    if 'all' == selected_manager:
-
-        if selected_statuses:
-            base_df = base_df[base_df['status'].isin(selected_statuses)]
-            agg_df = agg_df[agg_df['status'].isin(selected_statuses)]
-
-        pivot_df = agg_df.pivot(index='status', columns='date', values=count_proportion_radio).reset_index().fillna(0)
-        pivot_df.columns = pivot_df.columns.astype(str)
-        pivot_columns = pivot_df.columns[1:]
-        for col in pivot_columns:
-            pivot_df[col] = pivot_df[col].apply(lambda x: round(x, 3))
-
-        table = create_data_table('main-table-all', pivot_df, table_page_size)
-        fig = create_line_graph(agg_df, count_proportion_radio) # There is also an option for a grouped bar graph
-
-        return [fig, table]
-
-    else:
-
-        if selected_manager:
-            base_df = base_df[base_df['manager'] == selected_manager]
-        else:
-            return dash.no_update
-
-        if selected_statuses:
-            base_df = base_df[base_df['status'].isin(selected_statuses)]
-        manager_agg_df = calculate_aggregations(base_df, ['date', 'status'])
-        manager_pivot_df = manager_agg_df.pivot(index='status', columns='date', values=count_proportion_radio).reset_index().fillna(0)
-        manager_pivot_df.columns = manager_pivot_df.columns.astype(str)
-
-        table = create_data_table('main-table-part', manager_pivot_df, table_page_size)
-        fig = create_line_graph(manager_agg_df, count_proportion_radio)
-
-        return [fig, table]
-
-
-
-@callback(
-    Output('vehicle-view-graph-container', 'children'),
-    [
-        Input('tabs', 'value'),
-        Input('plate-dropdown', 'value'),
-        Input('date-picker-range', 'start_date'),
-        Input('date-picker-range', 'end_date')
-    ]
-)
-def update_vehicle_view(tab, selected_plate, start_date, end_date):
-    if tab != 'vehicle-tab':
-        return dash.no_update
-
-    df = select_plate(
-        plate=selected_plate,
-        from_date=start_date,
-        to_date=end_date
-    )
-
-    # Create a line graph showing the status of the vehicle over time
-    fig = px.line(df, x='date', y='status', title='Vehicle Status Over Time', markers=True)
-    fig.update_layout(height=400, xaxis_tickangle=-45)
-    fig.update_xaxes(tickformat="%Y-%m-%d")
-
-    return dbc.Row([dbc.Col(dcc.Graph(figure=fig), width=12)])
-
-
-
-def calculate_aggregations(base_df, group_columns):
-    grouped_data = base_df.groupby(group_columns).agg({'kendra_id': list}).reset_index()
-    grouped_data['count'] = grouped_data['kendra_id'].apply(len)
-    total_count_data = base_df.groupby(group_columns[:-1]).size().reset_index(name='total_count')
-    proportion_data = pd.merge(grouped_data, total_count_data, on=group_columns[:-1])
-    proportion_data['proportion'] = proportion_data['count'] / proportion_data['total_count']
-    proportion_data['proportion'] = proportion_data['proportion'].apply(lambda x: round(x, 3))
-    return proportion_data
-
-def calculate_status_periods(base_df):
-    # Ensure 'date' is in datetime format
-    base_df['date'] = pd.to_datetime(base_df['date'])
-
-    # Sort the DataFrame by 'plate' and 'date' to ensure correct order
-    base_df.sort_values(by=['plate', 'date'], inplace=True)
-
-    # Calculate the difference in days between each row's date and the previous row's date for each plate
-    base_df['date_diff'] = base_df.groupby('plate')['date'].diff().dt.days
-
-    # Flag rows where the status changes or the date difference is more than 1 day
-    base_df['status_change'] = (base_df['status'] != base_df['status'].shift()) | (base_df['date_diff'] > 1)
-
-    # Cumulatively sum the flags to create unique groups for continuous periods
-    base_df['group'] = base_df.groupby('plate')['status_change'].cumsum()
-
-    # Group by 'plate', 'status', and 'group' to calculate the length of each continuous period
-    continuous_periods = base_df.groupby(['plate', 'status', 'group']).size().reset_index(name='length')
-
-    # Find the longest continuous period for each plate
-    longest_continuous_periods = continuous_periods.loc[continuous_periods.groupby(['plate'])['length'].idxmax()]
-
-    # Calculate the total period for each status of a plate, regardless of continuity
-    total_periods = base_df.groupby(['plate', 'status']).size().reset_index(name='total_length')
-
-    # Find the status with the longest total period for each plate
-    longest_total_periods = total_periods.loc[total_periods.groupby(['plate'])['total_length'].idxmax()]
-
-    # Merge the longest continuous and total periods into a single DataFrame
-    merged_periods = pd.merge(longest_continuous_periods, longest_total_periods, on='plate', suffixes=('_cont', '_total'))
-
-    # Select and rename columns
-    merged_periods = merged_periods[['plate', 'status_cont', 'length', 'status_total', 'total_length']]
-    merged_periods.rename(columns={'status_cont': 'longest_continued_status', 'length': 'longest_continued_days', 'status_total': 'greatest_total_status', 'total_length': 'greatest_total_days'}, inplace=True)
-
-    return merged_periods
-
-
-def filter_and_format(base_df, date, status):
-    filtered_df = base_df[(pd.to_datetime(base_df['date']).dt.date == date) & (base_df['status'] == status)].copy()
-    filtered_df['date'] = pd.to_datetime(filtered_df['date'])
-    filtered_df['date'] = filtered_df['date'].dt.strftime('%Y-%m-%d')
-    filtered_df.drop(columns=['kendra_id', 'date', 'status'], inplace=True)
-    return filtered_df
-
-def sanity_check(expected_count, actual_count):
-    """
-    Performs a sanity check comparing expected and actual counts.
-    Returns a message if there's a mismatch, otherwise None.
-    """
-    if expected_count != actual_count:
-        return f"Something is rotten in the state of Denmark: Expected {expected_count} rows, but found {actual_count}. Please contact Carlos at trebbau@auro-group.com"
-    return None
-
-
 # Perform the sanity check if count-proportion-radio is set to 'count'
 # if count_proportion_radio == 'count':
 #     filtered_agg_df = agg_df.loc[(agg_df['status'] == status) & (pd.to_datetime(agg_df['date']).dt.date == date)]
@@ -317,7 +254,6 @@ def sanity_check(expected_count, actual_count):
 # if sanity_check_result:
 #     return True, "", sanity_check_result
 
-# Run the app
 
 ########## Begin Dropdown Options ##########
 @callback(
