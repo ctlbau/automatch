@@ -4,7 +4,7 @@ from dash_deck import DeckGL
 from dash import html, callback, ALL
 import pydeck as pdk
 from utils.geo_utils import geoencode_address, calculate_isochrones, partition_drivers_by_isochrones, extract_coords_from_encompassing_isochrone, check_partitions_intersection
-from db.automatch import fetch_drivers, fetch_shifts, fetch_managers
+from db.automatch import fetch_drivers, fetch_shifts, fetch_managers, fetch_centers
 from dash.dependencies import Input, Output, State
 from dash import dcc
 from dash import dash_table, dcc, html
@@ -49,6 +49,13 @@ layout = html.Div([
             id='managers-dropdown',
             options=[{'label': manager['name'], 'value': manager['name']} for manager in fetch_managers().to_dict('records')],
             placeholder='Select a manager',
+            multi=True,
+            style={'marginBottom': '10px'}
+        ),
+        dcc.Dropdown(  # Dropdown for center selection
+            id='center-dropdown',
+            options=[{'label': center['name'], 'value': center['name']} for center in fetch_centers().to_dict('records')],
+            placeholder='Select a center',
             multi=True,
             style={'marginBottom': '10px'}
         ),
@@ -118,12 +125,12 @@ layout = html.Div([
 
 @callback(
     [Output('map', 'data'), Output('data-tables-container', 'children'), Output('alert-fail-geoencode', 'is_open')],
-    [Input('submit-val', 'n_clicks'), Input('shifts-dropdown', 'value'), Input('managers-dropdown', 'value'), Input('is-matched-radio', 'value')],
+    [Input('submit-val', 'n_clicks'), Input('shifts-dropdown', 'value'), Input('managers-dropdown', 'value'), Input('is-matched-radio', 'value'), Input('center-dropdown', 'value')],
     [State('street-input', 'value'),
      State('zip-code-input', 'value'),
      State('time-limit-range-slider', 'value')]
 )
-def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_matched_filter, street, zip_code, time_limits):
+def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_matched_filter, selected_center, street, zip_code, time_limits):
     if n_clicks > 0:
         geoencode_result = geoencode_address(street, zip_code)
         
@@ -152,6 +159,10 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
                 is_matched_value = True if is_matched_filter == 'true' else False
                 drivers_list = [driver for driver in drivers_list if driver['is_matched'] == is_matched_value]
                 drivers_gdf = drivers_gdf[drivers_gdf['is_matched'] == is_matched_value]
+            
+            if selected_center:
+                drivers_list = [driver for driver in drivers_list if driver['center'] in selected_center]
+                drivers_gdf = drivers_gdf[drivers_gdf['center'].isin(selected_center)]
 
             # Define icon data
             icon_data = {
@@ -192,7 +203,6 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
                 auto_highlight=True,
             )
             initial_view_state = computed_view_state
-            print(drivers_list)
 
             new_deck_data = pdk.Deck(
                 layers=[isochrone_layer, drivers_layer, icon_layer],

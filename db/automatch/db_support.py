@@ -2,9 +2,13 @@ import pandas as pd
 from db.db_connect import connect, kndauth, localauth, companies
 from sqlalchemy import text
 import json
-
-import pandas as pd
 import geopandas as gpd
+
+def fetch_centers():
+    engine = connect(localauth)
+    query = text("SELECT id, name FROM Centers;")
+    centers_df = pd.read_sql(query, engine)
+    return centers_df
 
 def fetch_managers():
     engine = connect(localauth)
@@ -106,30 +110,3 @@ def fetch_drivers():
         } for index, driver in drivers_gdf.iterrows()
     ]
     return drivers_df, drivers_gdf, drivers_list_dict
-
-# def fetch_drivers():
-#     query = """
-#     SELECT 
-#         D.kendra_id,
-#         D.name AS driver_name,
-#         D.street,
-#         D.city,
-#         D.country,
-#         D.zip_code,
-#         D.lat,
-#         D.lng,
-#         P.name AS province_name,
-#         M.name AS manager_name,
-#         S.name AS shift_name
-#     FROM Drivers D
-#     LEFT JOIN Provinces P ON D.province_id = P.id
-#     LEFT JOIN Managers M ON D.manager_id = M.id
-#     LEFT JOIN Shifts S ON D.shift_id = S.id;
-#     """
-#     with connect(localauth) as local_conn:
-#         with local_conn.cursor() as local_cursor:
-#             local_cursor.execute(query)
-#             drivers = local_cursor.fetchall()
-#             columns = [desc[0] for desc in local_cursor.description]
-#             drivers = pd.DataFrame(drivers, columns=columns)
-#     return drivers
