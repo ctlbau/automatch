@@ -10,7 +10,7 @@ from dash import dcc
 from dash import dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
-from ui.components import create_navbar
+from ui.components import create_navbar, create_data_table
 
 dash.register_page(__name__, path='/')
 
@@ -111,7 +111,7 @@ layout = html.Div([
             type="circle"
         ),
     ], style={'width': '80%', 'position': 'relative', 'marginTop': '20px'}),  # Adjust marginTop as needed
-    html.Div(id='data-tables-container', children=[]),  # Container for dynamic data tables
+    html.Div(id='data-tables-container', children=[], style={'width': '75%', 'position': 'relative', 'marginTop': '20px'}),  # Container for dynamic data tables
     # html.Button('Create Match', id='create-match', n_clicks=0, style={'marginTop': '20px', 'marginBottom': '20px'}),  # Button for creating matches
     # dcc.Store(id='drivers-to-match-store'),  # Store for selected drivers' IDs
 ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
@@ -213,14 +213,7 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
             num_partitions = len(partitioned_drivers)
             for i, partition in enumerate(partitioned_drivers):
                 partition = partition.drop(columns=['geometry', 'lat', 'lng', 'zip_code', 'province', 'city', 'country'])
-                table = dash_table.DataTable(
-                    id={'type': 'drivers-table', 'index': i},
-                    columns=[{"name": col, "id": col} for col in partition.columns],
-                    data=partition.to_dict('records'),
-                    style_table={'overflowX': 'auto'},
-                    page_size=10,
-                    style_cell={'textAlign': 'left'},
-                )
+                table = create_data_table({'type': 'drivers-table', 'index': i}, partition, page_size=10)
                 if i < num_partitions - 1:
                     number_of_drivers = len(partition)
                     iso_title = time_limits[0] + i * 5 

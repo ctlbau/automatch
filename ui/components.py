@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
+import dash_ag_grid as dag
 
 def create_navbar(title):
     return html.Nav(
@@ -197,35 +198,14 @@ def create_modal(modal_id, title_id, content_id, footer_id):
     )
 
 def create_data_table(id, data, page_size=10):
-    return dash_table.DataTable(
+    columnDefs = [{"field": i} for i in data.columns]
+    grid = dag.AgGrid(
         id=id,
-        columns=[{"name": i, "id": i} for i in data.columns],
-        data=data.to_dict('records'),
-        editable=False,
-        # row_selectable="multi",
-        # selected_rows=[],
-        style_cell={'textAlign': 'left'},
-        style_table={'overflowX': 'auto'},
-        page_size=page_size,
-        style_data_conditional=[
-            {
-                    'if': {'row_index': 'odd'},
-                    'backgroundColor': 'rgb(248, 248, 248)'
-            }
-            ],
-            style_header={
-                'backgroundColor': 'rgb(230, 230, 230)',
-                'fontWeight': 'bold'
-            },
+        rowData=data.to_dict("records"),
+        columnDefs=columnDefs,
+        dashGridOptions={"pagination": True,'paginationPageSize': page_size, 'animateRows': True, 'enableCellTextSelection': True},
     )
-
-# table = dash_table.DataTable(
-#             data=filtered_df.to_dict('records'),
-#             columns=[{"name": i, "id": i} for i in filtered_df.columns],
-#             style_table={'overflowX': 'auto'},
-#             page_size=10,  # Adjust based on preference
-#             style_cell={'textAlign': 'left'}
-#         )
+    return grid
 
 def create_grouped_graph(data, values_type):
     fig = go.Figure()
@@ -255,52 +235,3 @@ def create_line_graph(data, values_type):
     fig.update_layout(height=400, xaxis_tickangle=-45, yaxis=dict(type='log'))
     fig.update_xaxes(tickformat="%Y-%m-%d")
     return dcc.Graph(figure=fig)
-
-
-
-# trace_radio = html.Div([
-#     dcc.RadioItems(
-#         id='color-radio',
-#         options=[
-#             {'label': 'Trace by date', 'value': 'date'},
-#             {'label': 'Trace by status', 'value': 'status'}
-#         ],
-#         value='date',
-#         inline=True
-#     )
-#     ], className='mb-2')
-
-# def create_navbar_options(count_proportion_id, log_scale_id):
-#     return html.Nav(
-#         className="navbar navbar-expand-lg mb-2",
-#         children=[
-#             html.Div(
-#                 className="container-fluid",
-#                 children=[
-#                     html.Div(
-#                         dcc.RadioItems(
-#                             id=count_proportion_id,
-#                             options=[
-#                                 {'label': 'Count', 'value': 'count'},
-#                                 {'label': 'Proportion', 'value': 'proportion'}
-#                             ],
-#                             value='count',
-#                             inline=True
-#                         ), className="d-inline-block me-2"
-#                     ),
-#                     html.Div(
-#                         dcc.RadioItems(
-#                             id=log_scale_id,
-#                             options=[
-#                                 {'label': 'Linear Scale', 'value': 'linear'},
-#                                 {'label': 'Logarithmic Scale', 'value': 'log'}
-#                             ],
-#                             value='log',
-#                             inline=True,
-#                             style={'display': 'none'}
-#                         ), className="d-inline-block"
-#                     )
-#                 ]
-#             )
-#         ]
-#     )
