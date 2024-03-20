@@ -141,6 +141,7 @@ def update_modal_all(clicked_cell, clicked_row, companies, start_date, end_date,
         streaks_df = calculate_status_periods(status_df)
         status_df = status_df.merge(streaks_df, on='plate', how='left')
         status_df.drop(['date', 'status', 'date_diff', 'status_change', 'group'], axis=1, inplace=True)
+        status_df.drop_duplicates(subset=['plate'], inplace=True)
         modal_title = f"Overview of {len(status_df)} vehicles that have been, at some point, in {status} status between {start_date} and {end_date}"
         table = create_data_table(f'modal-content-all-overview-{status}', status_df, 10)
 
@@ -198,6 +199,7 @@ def update_modal_part(clicked_cell, clicked_row, companies, start_date, end_date
         status_df = status_df.merge(streaks_df, on='plate', how='left')
         # status_df['date'] = status_df['date'].dt.strftime('%Y-%m-%d')
         status_df.drop(['date','status', 'date_diff', 'status_change', 'group'], axis=1, inplace=True)
+        status_df.drop_duplicates(subset=['plate'], inplace=True)
         modal_title = f"Overview of {len(status_df)} vehicles that have been, at some point, in {status} status between {start_date} and {end_date}"
         table = create_data_table(f'modal-content-part-overview-{status}', status_df, 10)
 
