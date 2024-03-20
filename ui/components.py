@@ -203,7 +203,17 @@ def create_data_table(id, data, page_size=10):
         id=id,
         rowData=data.to_dict("records"),
         columnDefs=columnDefs,
-        dashGridOptions={"pagination": True,'paginationPageSize': page_size, 'animateRows': True, 'enableCellTextSelection': True},
+        defaultColDef={'filter': True},
+        columnSize="sizeToFit",
+        dashGridOptions=
+        {
+            'pagination': True,
+            'paginationPageSize': page_size,
+            'animateRows': True, 
+            'enableCellTextSelection': True,
+            'rowSelection': 'single',
+        },
+        className="ag-theme-quartz",
     )
     return grid
 
