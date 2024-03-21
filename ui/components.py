@@ -1,4 +1,4 @@
-from dash import dcc, html, dash_table
+from dash import dcc, html
 from db.fleetpulse.db_support import *
 from datetime import datetime, timedelta
 import dash_bootstrap_components as dbc
@@ -197,7 +197,7 @@ def create_modal(modal_id, title_id, content_id, footer_id):
         scrollable=True,
     )
 
-def create_data_table(id, data, page_size=10):
+def create_data_table(id, data, filename, page_size=10):
     columnDefs = [{"field": i} for i in data.columns]
     grid = dag.AgGrid(
         id=id,
@@ -205,6 +205,7 @@ def create_data_table(id, data, page_size=10):
         columnDefs=columnDefs,
         defaultColDef={'filter': True},
         columnSize="sizeToFit",
+        csvExportParams={'fileName': filename},
         dashGridOptions=
         {
             'pagination': True,

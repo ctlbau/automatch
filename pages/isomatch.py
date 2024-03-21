@@ -1,16 +1,16 @@
 import os
 import dash
 from dash_deck import DeckGL
-from dash import html, callback, ALL
+from dash import html, dcc, callback, ALL, MATCH
 import pydeck as pdk
 from utils.geo_utils import geoencode_address, calculate_isochrones, partition_drivers_by_isochrones, extract_coords_from_encompassing_isochrone, check_partitions_intersection
 from db.automatch import fetch_drivers, fetch_shifts, fetch_managers, fetch_centers
 from dash.dependencies import Input, Output, State
-from dash import dcc
-from dash import dash_table, dcc, html
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
 from ui.components import create_navbar, create_data_table
+import pandas as pd
+import io
 
 dash.register_page(__name__, path='/')
 
@@ -119,6 +119,8 @@ layout = html.Div([
         ),
     ], style={'width': '80%', 'position': 'relative', 'marginTop': '20px'}),  # Adjust marginTop as needed
     html.Div(id='data-tables-container', children=[], style={'width': '75%', 'position': 'relative', 'marginTop': '20px'}),  # Container for dynamic data tables
+    dcc.Store(id='csv-store'),  # To temporarily hold data for download
+    dcc.Download(id='csv-download')  # To trigger the download
     # html.Button('Create Match', id='create-match', n_clicks=0, style={'marginTop': '20px', 'marginBottom': '20px'}),  # Button for creating matches
     # dcc.Store(id='drivers-to-match-store'),  # Store for selected drivers' IDs
 ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
@@ -217,7 +219,9 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
             num_partitions = len(partitioned_drivers)
             for i, partition in enumerate(partitioned_drivers):
                 partition = partition.drop(columns=['geometry', 'lat', 'lng'])
-                table = create_data_table({'type': 'drivers-table', 'index': i}, partition, page_size=10)
+                csv_filename = f"drivers_partition_{times[i]}_minutes.csv"
+                table = create_data_table({'type': 'drivers-table', 'index': i}, partition, csv_filename, page_size=10)
+                download_button = html.Button('Download CSV', id={'type': 'download-csv', 'index': i}, n_clicks=0)
                 if i < num_partitions - 1:
                     number_of_drivers = len(partition)
                     iso_title = time_limits[0] + i * 5 
@@ -226,10 +230,20 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
                     # This is the last partition, so we give it a custom title
                     number_of_drivers = len(partition)
                     title = f'{number_of_drivers} drivers outside largest isochrone'
-                data_tables.append(html.Div(children=[html.H3(title), table], style={'margin': '20px'}))
+                data_tables.append(html.Div(children=[html.H3(title), table, download_button], style={'margin': '20px'}))
 
             return new_deck_data, data_tables, False
         else:
             # No clicks yet, do not update anything and ensure the alert is closed
             return dash.no_update, dash.no_update, False
     return dash.no_update, dash.no_update, False
+
+@callback(
+    Output({'type': 'drivers-table', 'index': MATCH}, 'exportDataAsCsv'),
+    Input({'type': 'download-csv', 'index': MATCH}, 'n_clicks'),
+    prevent_initial_call=True
+)
+def download_csv(n_clicks):
+    if n_clicks > 0:
+        return True
+    return dash.no_update
