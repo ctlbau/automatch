@@ -1,8 +1,9 @@
 from sqlalchemy.exc import OperationalError, DBAPIError
 from sqlalchemy import create_engine
-# import pymysql
-# from time import sleep
 import os
+from dotenv import load_dotenv
+
+load_dotenv('.env')
 
 kndauth = {
     "dialect": "mysql+pymysql",
@@ -14,8 +15,8 @@ kndauth = {
 
 localauth = {
     "dialect": "mysql+pymysql",
-    "username": "root",
-    "password": os.environ['MYSQL_ROOT_PWD'],
+    "username": "ctl",
+    "password": os.environ['MYSQL_CTL_PWD'],
     "host": "localhost",
     "dbname": "autopulse"
 }

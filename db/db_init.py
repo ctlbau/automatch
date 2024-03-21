@@ -1,72 +1,78 @@
-from db.db_connect import *
-
-def connect(auth):
-    while True:
-        try:
-            return pymysql.connect(
-                host=auth['host'],
-                user=auth['user'],
-                password=auth['password'],
-                database=auth.get('database', None),
-                # autocommit=True
-            )
-        except pymysql.MySQLError as e:
-            print(f"Failed to connect to MySQL: {e}")
-            sleep(1)
+from db_connect import *
+from sqlalchemy import text
 
 def create_autopulse_db():
-    with connect({**localauth, 'database': None}) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("CREATE DATABASE IF NOT EXISTS autopulse;")
-    localauth['database'] = 'autopulse'
+    engine = connect({**localauth, 'database': None})
+    if engine:
+        with engine.begin() as conn:  # Use a transaction
+            conn.execute(text("CREATE DATABASE IF NOT EXISTS autopulse;"))
+        localauth['database'] = 'autopulse'  # Update localauth to use the new database
 
 def create_managers_table():
-    with connect(localauth) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
+    engine = connect(localauth)
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS Managers(
                     id INT PRIMARY KEY,
                     name VARCHAR(50)
                 );
-            """)
+            """))
+
 
 def create_company_table():
     with connect(localauth) as conn:
         with conn.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(text("""
                 CREATE TABLE IF NOT EXISTS Companies (
                     id INT PRIMARY KEY,
                     name VARCHAR(60)
                 );
-            """)
+            """))
+
+def create_company_table():
+    engine = connect(localauth)
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS Companies (
+                    id INT PRIMARY KEY,
+                    name VARCHAR(60)
+                );
+            """))
+
 
 def create_center_table():
-    with connect(localauth) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
+    engine = connect(localauth)
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS Centers (
                     id INT PRIMARY KEY,
                     name VARCHAR(70)
                 );
-            """)
+            """))
 
 def create_companies_centers_table():
-    with connect(localauth) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
+    engine = connect(localauth)
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS CompaniesCenters (
                     company_id INT,
                     center_id INT,
                     PRIMARY KEY (company_id, center_id),
-                    FOREIGN KEY (company_id) REFERENCES Companies(id),
-                    FOREIGN KEY (center_id) REFERENCES Centers(id)
+                    FOREIGN KEY (company_id) REFERENCES Companies(id) ON DELETE CASCADE,
+                    FOREIGN KEY (center_id) REFERENCES Centers(id) ON DELETE CASCADE
                 );
-            """)
+            """))
+
 
 def create_vehicle_table():
-    with connect(localauth) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
+    engine = connect(localauth)
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS Vehicles (
                     kendra_id INT NOT NULL,
                     plate VARCHAR(10) NOT NULL,
@@ -79,15 +85,15 @@ def create_vehicle_table():
                     INDEX (kendra_id),
                     FOREIGN KEY (company_id) REFERENCES Companies(id),
                     FOREIGN KEY (center_id) REFERENCES Centers(id),
-                    FOREIGN KEY (manager_id) REFERENCES Managers(id)
+                    FOREIGN KEY (manager_id) REFERENCES Managers(id) ON DELETE CASCADE
                 );
-            """)
-
+            """))
 
 def create_drivers_table():
-    with connect(localauth) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
+    engine = connect(localauth)
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS Drivers (
                     kendra_id INT PRIMARY KEY,
                     name VARCHAR(100),
@@ -101,43 +107,46 @@ def create_drivers_table():
                     manager_id INT,
                     shift_id INT,
                     FOREIGN KEY (province_id) REFERENCES Provinces(id),
-                    FOREIGN KEY (manager_id) REFERENCES Managers(id),
-                    FOREIGN KEY (shift_id) REFERENCES Shifts(id)
+                    FOREIGN KEY (manager_id) REFERENCES Managers(id) ON DELETE CASCADE,
+                    FOREIGN KEY (shift_id) REFERENCES Shifts(id) ON DELETE CASCADE
                 );
-            """)
+            """))
 
 def create_shifts_table():
-    with connect(localauth) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
+    engine = connect(localauth)
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS Shifts (
                     id INT PRIMARY KEY,
-                    name VARCHAR(50)
+                    name VARCHAR(70)
                 );
-            """)
+            """))
 
 def create_provinces_table():
-    with connect(localauth) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
+    engine = connect(localauth)
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS Provinces (
                     id INT PRIMARY KEY,
                     name VARCHAR(100)
                 );
-            """)
+            """))
 
 def create_drivers_vehicles_table():
-    with connect(localauth) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
+    engine = connect(localauth)
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS DriversVehicles (
                     driver_id INT,
                     vehicle_id INT,
                     PRIMARY KEY (driver_id, vehicle_id),
-                    FOREIGN KEY (driver_id) REFERENCES Drivers(kendra_id),
-                    FOREIGN KEY (vehicle_id) REFERENCES Vehicles(kendra_id)
+                    FOREIGN KEY (driver_id) REFERENCES Drivers(kendra_id) ON DELETE CASCADE,
+                    FOREIGN KEY (vehicle_id) REFERENCES Vehicles(kendra_id) ON DELETE CASCADE
                 );
-            """)
+            """))
 
 # Main execution block
 if __name__ == "__main__":
