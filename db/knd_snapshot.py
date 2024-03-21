@@ -183,6 +183,53 @@ def fetch_and_insert_provinces(kndauth, localauth):
         local_conn.commit()
         print("Provinces data inserted successfully")
 
+def delete_absent_drivers():
+    # Connect to the kndauth database and fetch all active driver IDs
+    engine_knd = connect(kndauth)
+    knd_driver_ids_query = """
+    SELECT
+        e.id
+    FROM
+        employee e
+        INNER JOIN employee e2 ON e2.id = e.fleet_manager_id
+        INNER JOIN employee_contract c ON e.current_contract_id = c.id
+        INNER JOIN center ce ON c.working_center_id = ce.id
+        INNER JOIN address a ON ce.address_id = a.id
+        INNER JOIN employee_shifts es ON e.id = es.employee_id
+        INNER JOIN shift s ON s.id = es.shift_id
+    WHERE
+        e.geolocation_latitude IS NOT NULL
+        AND e.geolocation_longitude IS NOT NULL
+        AND e.status = 'active'
+        AND (es.end_date IS NULL OR es.end_date >= date(now()))
+        AND es.start_date <= date(now())
+        AND e.position_id in (6, 30)
+        AND es.deleted_at IS NULL
+    """
+    with engine_knd.connect() as conn_knd:
+        result_knd = conn_knd.execute(text(knd_driver_ids_query))
+        knd_driver_ids = set([row[0] for row in result_knd.fetchall()])
+
+    # Connect to the localauth database and fetch all driver IDs
+    engine_local = connect(localauth)
+    local_driver_ids_query = "SELECT kendra_id FROM Drivers"
+    with engine_local.connect() as conn_local:
+        result_local = conn_local.execute(text(local_driver_ids_query))
+        local_driver_ids = set([row[0] for row in result_local.fetchall()])
+
+    # Identify drivers in localauth not in kndauth
+    absent_driver_ids = local_driver_ids - knd_driver_ids
+    deleted_drivers_count = 0
+
+    # Delete absent drivers from the localauth database
+    delete_driver_query = "DELETE FROM Drivers WHERE kendra_id = :kendra_id"
+    with engine_local.connect() as conn_local:
+        for driver_id in absent_driver_ids:
+            conn_local.execute(text(delete_driver_query), {'kendra_id': driver_id})
+            deleted_drivers_count += 1
+
+    print(f"Deleted {deleted_drivers_count} absent drivers from the local database.")
+
 def fetch_and_insert_drivers(kndauth, localauth):
     select_query = text("""
     SELECT
@@ -304,6 +351,7 @@ if __name__ == "__main__":
     ensure_companies_exist(df)
     ensure_centers_exist(df)
     insert_vehicle_data(df)
+    delete_absent_drivers()
     fetch_and_insert_shift_data(kndauth, localauth)
     fetch_and_insert_provinces(kndauth, localauth)
     fetch_and_insert_drivers(kndauth, localauth)
