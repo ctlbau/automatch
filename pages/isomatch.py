@@ -11,6 +11,7 @@ from dash.dependencies import ALL
 from ui.components import create_navbar, create_data_table
 import pandas as pd
 import io
+from datetime import datetime
 
 dash.register_page(__name__, path='/')
 
@@ -219,7 +220,8 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
             num_partitions = len(partitioned_drivers)
             for i, partition in enumerate(partitioned_drivers):
                 partition = partition.drop(columns=['geometry', 'lat', 'lng'])
-                csv_filename = f"drivers_partition_{times[i]}_minutes.csv"
+                current_date = datetime.now().strftime("%Y-%m-%d")
+                csv_filename = f"drivers_within_{time_limits[0] + i * 5}_min_isochrone_on_{current_date}.csv"
                 table = create_data_table({'type': 'drivers-table', 'index': i}, partition, csv_filename, page_size=10)
                 download_button = html.Button('Download CSV', id={'type': 'download-csv', 'index': i}, n_clicks=0)
                 if i < num_partitions - 1:
