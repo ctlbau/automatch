@@ -29,7 +29,7 @@ def calculate_isochrones(lat: float, lon: float, times: list) -> dict:
     params = {
         "point": f"{lat},{lon}",
         "time_limit": max_time * 60,  # Convert to seconds
-        "vehicle": "car",
+        "profile": "car",
         "buckets": buckets
     }
     response = req.get(GRAPHHOPPER_URL, params=params)
