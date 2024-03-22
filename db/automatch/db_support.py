@@ -47,6 +47,10 @@ def fetch_drivers_geojson():
     drivers_geojson = json.loads(drivers_gdf.to_json())
     return drivers_geojson
 
+import pandas as pd
+import geopandas as gpd
+from sqlalchemy import text
+
 def fetch_drivers():
     engine = connect(localauth)
     query = text("""SELECT
@@ -60,7 +64,8 @@ def fetch_drivers():
                         match1.shift,
                         match1.center,
                         IF(COUNT(DISTINCT match2.driver_id) > 0, 1, 0) AS is_matched,
-                        GROUP_CONCAT(DISTINCT match2.name ORDER BY match2.name SEPARATOR ', ') AS matched_with
+                        GROUP_CONCAT(DISTINCT match2.name ORDER BY match2.name SEPARATOR ', ') AS matched_with,
+                        match1.exchange_location
                     FROM (
                         SELECT
                             D.kendra_id AS driver_id,
@@ -69,6 +74,8 @@ def fetch_drivers():
                             D.lat,
                             D.lng,
                             DV.vehicle_id,
+                            DV.exchange_location_id,  -- Needed for joining with ExchangeLocations
+                            EL.name AS exchange_location,  -- Joining with ExchangeLocations to get the name
                             M.name AS manager,
                             S.name AS shift,
                             C.name AS center
@@ -76,6 +83,7 @@ def fetch_drivers():
                             Drivers D
                             JOIN DriversVehicles DV ON D.kendra_id = DV.driver_id
                             JOIN Vehicles V ON DV.vehicle_id = V.kendra_id
+                            LEFT JOIN ExchangeLocations EL ON DV.exchange_location_id = EL.id  -- LEFT JOIN to include drivers even if exchange_location_id is NULL
                             JOIN Managers M ON D.manager_id = M.id
                             JOIN Shifts S ON D.shift_id = S.id
                             JOIN Centers C ON V.center_id = C.id
@@ -90,11 +98,11 @@ def fetch_drivers():
                             JOIN DriversVehicles DV ON D.kendra_id = DV.driver_id
                     ) AS match2 ON match1.vehicle_id = match2.vehicle_id AND match1.driver_id != match2.driver_id
                     GROUP BY
-                        match1.driver_id, match1.driver_name, match1.street, match1.lat, match1.lng, match1.vehicle_id, match1.manager, match1.shift, match1.center
+                        match1.driver_id, match1.driver_name, match1.street, match1.lat, match1.lng, match1.vehicle_id, match1.manager, match1.shift, match1.center, match1.exchange_location
                     ORDER BY
                         match1.driver_id;""")
     drivers_df = pd.read_sql(query, engine)
-    drivers_gdf = gpd.GeoDataFrame(drivers_df, geometry=gpd.points_from_xy(drivers_df.lng, drivers_df.lat)).set_crs(epsg=4326)
+    drivers_gdf = gpd.GeoDataFrame(drivers_df, geometry=gpd.points_from_xy(drivers_df.lng, drivers_df.lat), crs='EPSG:4326')
     drivers_list_dict = [
         {
             "coordinates": [driver.geometry.x, driver.geometry.y],
@@ -107,6 +115,8 @@ def fetch_drivers():
             "center": driver["center"],
             "is_matched": driver["is_matched"],
             "matched_with": driver["matched_with"],
+            "exchange_location": driver["exchange_location"],  # Include exchange location in the dictionary
         } for index, driver in drivers_gdf.iterrows()
     ]
     return drivers_df, drivers_gdf, drivers_list_dict
+

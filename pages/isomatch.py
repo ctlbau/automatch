@@ -106,7 +106,7 @@ layout = html.Div([
                         ).to_json(),
                         mapboxKey=MAPBOX_API_KEY,
                         tooltip={
-                            "html": "<b>Name:</b> {name}<br><b>Street:</b> {street}<br><b>Manager:</b> {manager}<br><b>Shift:</b> {shift} <br> <b>Center:</b> {center}",
+                            "html": "<b>Name:</b> {name}<br><b>Street:</b> {street}<br><b>Manager:</b> {manager}<br><b>Shift:</b> {shift} <br> <b>Center:</b> {center}, <b>Matched:</b> {is_matched} <br> <b>Matched With:</b> {matched_with} <br> <b>Exchange Location:</b> {exchange_location}",
                             "style": {
                                 "backgroundColor": "steelblue",
                                 "color": "white"
