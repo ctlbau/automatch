@@ -68,6 +68,18 @@ def create_companies_centers_table():
             """))
 
 
+def create_exchange_location_table():
+    engine = connect(localauth)
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS ExchangeLocations (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(100) UNIQUE NOT NULL
+                );
+            """))
+
+
 def create_vehicle_table():
     engine = connect(localauth)
     if engine:
@@ -85,7 +97,7 @@ def create_vehicle_table():
                     INDEX (kendra_id),
                     FOREIGN KEY (company_id) REFERENCES Companies(id),
                     FOREIGN KEY (center_id) REFERENCES Centers(id),
-                    FOREIGN KEY (manager_id) REFERENCES Managers(id) ON DELETE CASCADE
+                    FOREIGN KEY (manager_id) REFERENCES Managers(id)
                 );
             """))
 
@@ -142,16 +154,20 @@ def create_drivers_vehicles_table():
                 CREATE TABLE IF NOT EXISTS DriversVehicles (
                     driver_id INT,
                     vehicle_id INT,
+                    exchange_location_id INT,
                     PRIMARY KEY (driver_id, vehicle_id),
                     FOREIGN KEY (driver_id) REFERENCES Drivers(kendra_id) ON DELETE CASCADE,
-                    FOREIGN KEY (vehicle_id) REFERENCES Vehicles(kendra_id) ON DELETE CASCADE
+                    FOREIGN KEY (vehicle_id) REFERENCES Vehicles(kendra_id) ON DELETE CASCADE,
+                    FOREIGN KEY (exchange_location_id) REFERENCES ExchangeLocations(id)
                 );
             """))
+
 
 # Main execution block
 if __name__ == "__main__":
     create_autopulse_db()
     create_managers_table()
+    create_exchange_location_table()
     create_company_table()
     create_center_table()
     create_companies_centers_table()

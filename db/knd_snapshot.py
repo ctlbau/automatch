@@ -5,6 +5,133 @@ from db.db_connect import connect, kndauth, localauth, companies
 from sqlalchemy import text
 import numpy as np
 
+exchange_locations = {
+        'parking_lot': 'Campa de Auro',
+        'parking_1': 'Parking Marqués de Urquijo',
+        'parking_2': 'Parking Reyes Magos',
+        'parking_3': 'Campa de Coslada',
+        'outside_exchange': 'Cambio fuera',
+        'home_full_shift': 'Turno completo en casa'
+    }
+
+def synchronize_exchange_locations(exchange_locations=exchange_locations):
+
+    kendra_engine = connect(kndauth)
+    local_engine = connect(localauth)
+    
+    if kendra_engine and local_engine:
+        # Retrieve unique exchange location keys from Kendra
+        with kendra_engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT DISTINCT vehicle.location AS exchange_location
+                FROM vehicle
+            """))
+            # Ensure result rows are accessed as dictionaries
+            kendra_location_keys = {row['exchange_location'] for row in result.mappings() if row['exchange_location'] is not None}
+        
+        with local_engine.begin() as conn:
+            # Retrieve current location names from your ExchangeLocations table
+            current_locations_result = conn.execute(text("SELECT name FROM ExchangeLocations;"))
+            current_locations = {row['name'] for row in current_locations_result.mappings()}
+
+            for key in kendra_location_keys:
+                # Map the key to its descriptive name, or use the key itself if not found in the map
+                location_name = exchange_locations.get(key, key)
+                
+                # Skip attempting to insert NULL or empty strings
+                if location_name and location_name not in current_locations:
+                    conn.execute(text("INSERT INTO ExchangeLocations (name) VALUES (:location_name);"),
+                                 {'location_name': location_name})
+                    # After inserting, add it to current_locations to avoid trying to insert it again
+                    current_locations.add(location_name)
+
+
+def fetch_and_insert_drivers_vehicles(kndauth, localauth):
+
+    engine_knd = connect(kndauth)
+    engine_local = connect(localauth)
+    
+    select_query = text("""
+                        SELECT
+                            e.id AS driver_id,
+                            v.id AS vehicle_id,
+                            v.location AS exchange_location
+                        FROM
+                            vehicle v
+                            INNER JOIN vehicle_allocation va ON v.id = va.vehicle_id
+                            INNER JOIN employee e ON va.employee_id = e.id
+                            AND va.from_date <= current_date()
+                            AND (va.to_date >= current_date() OR va.to_date IS NULL)
+                            AND va.deleted_at IS NULL
+                        WHERE
+                            v.status = 'active'
+                            AND v.deleted_at IS NULL
+                            AND e.geolocation_latitude IS NOT NULL
+                            AND e.geolocation_longitude IS NOT NULL
+                            AND e.status = 'active'
+                        ORDER BY
+                            e.id, v.id;
+                        """)
+
+    with engine_knd.connect() as knd_conn, engine_local.connect() as local_conn:
+        result = knd_conn.execute(select_query)
+        for row in result.mappings():
+
+            location_key = row['exchange_location']
+            exchange_location_id = get_or_create_exchange_location(local_conn, location_key)
+
+            local_conn.execute(text("""
+                INSERT INTO DriversVehicles (driver_id, vehicle_id, exchange_location_id)
+                SELECT :driver_id, :vehicle_id, :exchange_location_id
+                FROM dual
+                WHERE EXISTS (
+                    SELECT 1 FROM Drivers d WHERE d.kendra_id = :driver_id
+                ) AND EXISTS (
+                    SELECT 1 FROM Vehicles v WHERE v.kendra_id = :vehicle_id
+                )
+                ON DUPLICATE KEY UPDATE
+                driver_id = VALUES(driver_id),
+                vehicle_id = VALUES(vehicle_id),
+                exchange_location_id = VALUES(exchange_location_id);
+            """), {
+                'driver_id': row['driver_id'], 
+                'vehicle_id': row['vehicle_id'],
+                'exchange_location_id': exchange_location_id
+            })
+        local_conn.commit()
+        print("DriversVehicles data inserted successfully.")
+
+
+def get_or_create_exchange_location(conn, location_key):
+    # Use the global mapping to resolve location names
+    location_name = exchange_locations.get(location_key, location_key)
+
+    if location_name is None:
+        return None
+    
+    normalized_location_name = location_name.strip().lower()
+    
+    # Attempt to fetch the ID of the existing location
+    fetch_id_query = text("""
+        SELECT id FROM ExchangeLocations WHERE LOWER(TRIM(name)) = :normalized_location_name;
+    """)
+    result = conn.execute(fetch_id_query, {'normalized_location_name': normalized_location_name})
+    location_id = result.scalar()
+    
+    # If the location does not exist, insert it and get the ID
+    if location_id is None:
+        insert_query = text("""
+            INSERT INTO ExchangeLocations (name) VALUES (:location_name);
+        """)
+        conn.execute(insert_query, {'location_name': location_name})  # Insert the descriptive name
+        conn.commit()
+        # Refetch the ID after insertion
+        result = conn.execute(fetch_id_query, {'normalized_location_name': normalized_location_name})
+        location_id = result.scalar()
+    
+    return location_id
+
+
 def get_vehicle_stati():
     engine = connect(kndauth)
     all_ids = companies['all']
@@ -118,7 +245,7 @@ def delete_absent_managers():
         print(f"Completed checking and deleting absent managers from local database. Total managers purged: {purged_managers_count}.")
 
 def insert_vehicle_data(df, engine=connect(localauth)):
-    df['date'] = pd.to_datetime(datetime.now().date())  # Ensures the column is datetime type with date only
+    df['date'] = pd.to_datetime(datetime.now().date())
 
     # Convert NaN values to None for the entire DataFrame
     df = df.replace({np.nan: None})
@@ -295,52 +422,6 @@ def fetch_and_insert_drivers(kndauth, localauth):
         local_conn.commit()
         print("Drivers data inserted successfully")
 
-def fetch_and_insert_drivers_vehicles(kndauth, localauth):
-    select_query = text("""
-    SELECT
-        e.id AS driver_id,
-        v.id AS vehicle_id
-    FROM
-        vehicle v
-        INNER JOIN vehicle_allocation va ON v.id = va.vehicle_id
-        INNER JOIN employee e ON va.employee_id = e.id
-        AND va.from_date <= current_date()
-        AND (va.to_date >= current_date() OR va.to_date IS NULL)
-        AND va.deleted_at IS NULL
-    WHERE
-        v.status = 'active'
-        AND v.deleted_at IS NULL
-        AND e.geolocation_latitude IS NOT NULL
-        AND e.geolocation_longitude IS NOT NULL
-        AND e.status = 'active'
-    ORDER BY
-        e.id, v.id;
-    """)
-    insert_query = text("""
-    INSERT INTO DriversVehicles (driver_id, vehicle_id)
-    SELECT * FROM (SELECT :driver_id AS driver_id, :vehicle_id AS vehicle_id) AS tmp
-    WHERE EXISTS (
-        SELECT 1 FROM Drivers d WHERE d.kendra_id = tmp.driver_id
-    ) AND EXISTS (
-        SELECT 1 FROM Vehicles v WHERE v.kendra_id = tmp.vehicle_id
-    )
-    ON DUPLICATE KEY UPDATE driver_id=VALUES(driver_id), vehicle_id=VALUES(vehicle_id);
-    """)
-
-    engine_knd = connect(kndauth)
-    with engine_knd.connect() as knd_conn:
-        result = knd_conn.execute(select_query)
-        drivers_vehicles = result.fetchall()
-    
-    engine_local = connect(localauth)
-    with engine_local.connect() as local_conn:
-        for driver_vehicle in drivers_vehicles:
-            local_conn.execute(insert_query, {
-                'driver_id': driver_vehicle.driver_id, 
-                'vehicle_id': driver_vehicle.vehicle_id
-            })
-        local_conn.commit()
-        print("DriversVehicles data inserted successfully")
 
 
 
@@ -355,5 +436,6 @@ if __name__ == "__main__":
     fetch_and_insert_shift_data(kndauth, localauth)
     fetch_and_insert_provinces(kndauth, localauth)
     fetch_and_insert_drivers(kndauth, localauth)
+    synchronize_exchange_locations()
     fetch_and_insert_drivers_vehicles(kndauth, localauth)
 
