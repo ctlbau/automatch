@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from datetime import datetime
-from db.db_connect import connect, kndauth, localauth, companies
+from db_connect import connect, kndauth, localauth, companies
 from sqlalchemy import text
 import numpy as np
 

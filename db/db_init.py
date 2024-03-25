@@ -19,17 +19,6 @@ def create_managers_table():
                 );
             """))
 
-
-def create_company_table():
-    with connect(localauth) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute(text("""
-                CREATE TABLE IF NOT EXISTS Companies (
-                    id INT PRIMARY KEY,
-                    name VARCHAR(60)
-                );
-            """))
-
 def create_company_table():
     engine = connect(localauth)
     if engine:
