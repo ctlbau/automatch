@@ -43,7 +43,6 @@ for region in $regions; do
     fi
 done
 
-# Merge the OSM files using Osmosis
-# osmosis --read-xml file="cataluna-latest.osm.bz2" --read-xml file="madrid-latest.osm.bz2" --merge --read-xml file="valencia-latest.osm.bz2" --merge --read-xml file="andalucia-latest.osm.bz2" --merge --write-xml file="${MERGED_FILE}"
+# Merge the OSM files using Osmium
 osmium merge andalucia-latest.osm.pbf cataluna-latest.osm.pbf madrid-latest.osm.pbf valencia-latest.osm.pbf -o "${MERGED_FILE}"
 
