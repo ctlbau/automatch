@@ -4,7 +4,7 @@ from dash_deck import DeckGL
 from dash import html, dcc, callback, ALL, MATCH
 import pydeck as pdk
 from utils.geo_utils import geoencode_address, calculate_isochrones, partition_drivers_by_isochrones, extract_coords_from_encompassing_isochrone, check_partitions_intersection
-from db.automatch import fetch_drivers, fetch_shifts, fetch_managers, fetch_centers
+from db.automatch import fetch_drivers, fetch_shifts, fetch_managers, fetch_centers, fetch_provinces
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
@@ -26,6 +26,14 @@ layout = html.Div([
     # Container for inputs and button
     html.Div([
         dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, style={'marginRight': '10px', 'width': '350px', 'display': 'block', 'marginBottom': '10px'}),
+        dcc.Dropdown(
+            id='province-dropdown',
+            options=[{'label': province['name'], 'value': province['id']} for province in fetch_provinces().to_dict('records')],
+            placeholder='Select a province',
+            multi=False,
+            # required=True, 
+            style={'marginRight': '10px', 'width': '350px', 'display': 'block', 'marginBottom': '10px'}
+        ),
         html.Div([  # Div to wrap zip-code-input and Submit button
             dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False, style={'marginRight': '10px', 'display': 'inline-block', 'marginBottom': '10px'}),
             html.Button('Submit', id='submit-val', n_clicks=0, style={'display': 'inline-block'}),
@@ -120,8 +128,6 @@ layout = html.Div([
         ),
     ], style={'width': '80%', 'position': 'relative', 'marginTop': '20px'}),  # Adjust marginTop as needed
     html.Div(id='data-tables-container', children=[], style={'width': '75%', 'position': 'relative', 'marginTop': '20px'}),  # Container for dynamic data tables
-    dcc.Store(id='csv-store'),  # To temporarily hold data for download
-    dcc.Download(id='csv-download')  # To trigger the download
     # html.Button('Create Match', id='create-match', n_clicks=0, style={'marginTop': '20px', 'marginBottom': '20px'}),  # Button for creating matches
     # dcc.Store(id='drivers-to-match-store'),  # Store for selected drivers' IDs
 ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
@@ -130,13 +136,16 @@ layout = html.Div([
     [Output('map', 'data'), Output('data-tables-container', 'children'), Output('alert-fail-geoencode', 'is_open')],
     [Input('submit-val', 'n_clicks'), Input('shifts-dropdown', 'value'), Input('managers-dropdown', 'value'), Input('is-matched-radio', 'value'), Input('center-dropdown', 'value')],
     [State('street-input', 'value'),
+     State('province-dropdown', 'options'),
+     State('province-dropdown', 'value'),
      State('zip-code-input', 'value'),
      State('time-limit-range-slider', 'value')]
 )
-def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_matched_filter, selected_center, street, zip_code, time_limits):
+def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_matched_filter, selected_center, street, selected_province, province_id, postal_code, time_limits):
     if n_clicks > 0:
-        geoencode_result = geoencode_address(street, zip_code)
-        
+        province = [province for province in selected_province if province['value'] == province_id][0]['label']
+        geoencode_result = geoencode_address(street, province, postal_code)
+
         if geoencode_result is None:
             # Geoencoding fails, show the alert
             return dash.no_update, dash.no_update, True  # Open the alert
@@ -148,7 +157,7 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
             isochrones_geojson = calculate_isochrones(lat, lon, times)
             isochrone_coords = extract_coords_from_encompassing_isochrone(isochrones_geojson)
             computed_view_state = pdk.data_utils.compute_view(isochrone_coords, view_proportion=0.9)
-            drivers_df, drivers_gdf, drivers_list = fetch_drivers()
+            drivers_gdf, drivers_list = fetch_drivers(province_id)
             
             if selected_shifts:
                 drivers_list = [driver for driver in drivers_list if driver['shift'] in selected_shifts]
@@ -221,7 +230,7 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
             for i, partition in enumerate(partitioned_drivers):
                 partition = partition.drop(columns=['geometry', 'lat', 'lng'])
                 current_date = datetime.now().strftime("%Y-%m-%d")
-                csv_filename = f"drivers_within_{time_limits[0] + i * 5}_min_isochrone_on_{current_date}.csv"
+                csv_filename = f"drivers_within_{time_limits[0] + i * 5}_min_isochrone_centered_on_{street}_{province}_at_{current_date}.csv"
                 table = create_data_table({'type': 'drivers-table', 'index': i}, partition, csv_filename, page_size=10)
                 download_button = html.Button('Download CSV', id={'type': 'download-csv', 'index': i}, n_clicks=0)
                 if i < num_partitions - 1:

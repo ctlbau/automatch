@@ -12,9 +12,9 @@ MAPBOX_API_KEY = os.environ["MAPBOX_TOKEN"]
 BASE_URL = "http://localhost:8989/isochrone"
 
 
-def geoencode_address(address: str, postal_code: str):
+def geoencode_address(address: str, province: str, postal_code: str):
     """ Get coordinates from Nominatim API, assuming the address is in Spain """
-    address += f", Madrid {postal_code}"
+    address += f", {province}, {postal_code}, España"
     params = {'q': address, 'format': 'json'}
     response = req.get('https://nominatim.openstreetmap.org/search', params=params)
     data = response.json()
@@ -45,7 +45,6 @@ def calculate_isochrones(lat: float, lon: float, times: list) -> dict:
     else:
         print(f"Failed to fetch isochrones: {response.status_code}")
         return None
-
 
 
 
