@@ -388,7 +388,7 @@ def fetch_and_insert_drivers(kndauth, localauth):
         AND es.start_date <= date(now())
         AND e.position_id in (6, 30)
         AND es.deleted_at IS NULL
-        AND a.province_id in (28)
+        AND a.province_id in (28, 8, 29, 41, 46)
     ORDER BY
         e.id;""")
     
@@ -432,10 +432,9 @@ if __name__ == "__main__":
     ensure_companies_exist(df)
     ensure_centers_exist(df)
     insert_vehicle_data(df)
-    delete_absent_drivers()
+    # delete_absent_drivers()
     fetch_and_insert_shift_data(kndauth, localauth)
     fetch_and_insert_provinces(kndauth, localauth)
     fetch_and_insert_drivers(kndauth, localauth)
     synchronize_exchange_locations()
     fetch_and_insert_drivers_vehicles(kndauth, localauth)
-
