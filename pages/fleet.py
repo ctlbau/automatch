@@ -206,6 +206,7 @@ def download_csv(n_clicks):
     Output('details-modal-part', 'is_open'),
     Output('details-modal-title-part', 'children'),
     Output('modal-content-part', 'children'),
+    Output('modal-footer-part', 'children'),
     [
         Input('main-table-part', 'cellClicked'),
         State('main-table-part', 'selectedRows'),
@@ -219,14 +220,14 @@ def download_csv(n_clicks):
 )
 def update_modal_part(clicked_cell, clicked_row, companies, start_date, end_date, selected_statuses, selected_manager, count_proportion_radio):
     if not clicked_cell:
-        return False, "", []
+        return False, "", [], []
 
     column_selected = clicked_cell['colId']
     status = clicked_row[0]['status']
     
     base_df = fetch_vehicles(company=companies, from_date=start_date, to_date=end_date)
     if base_df is None or base_df.empty:
-        return False, "", []
+        return False, "", [], []
     
     status_df = base_df[base_df['status'] == status].copy()
     if selected_manager:
@@ -239,25 +240,44 @@ def update_modal_part(clicked_cell, clicked_row, companies, start_date, end_date
         status_df.drop(['date','status', 'date_diff', 'status_change', 'group'], axis=1, inplace=True)
         status_df.drop_duplicates(subset=['plate'], inplace=True)
         modal_title = f"Overview of {len(status_df)} vehicles that have been, at some point, in {status} status between {start_date} and {end_date}"
-        table = create_data_table(f'modal-content-part-overview-{status}', status_df, "", 10)
+        csv_filename = f'{status}_between_{start_date}_and_{end_date}_for_{selected_manager}.csv'
+        table = create_data_table(f'modal-content-part-total-unique', status_df, csv_filename, 10)
+        download_button = html.Button('Download CSV', id='download-modal-table-status-csv', n_clicks=0)
 
-        return True, modal_title, table
+        return True, modal_title, table, download_button
     
     elif column_selected == 'status':
-        return False, "", []
+        return False, "", [], []
 
     else:
         date = pd.to_datetime(column_selected).date()
         filtered_df = filter_and_format(status_df, date, status)
 
         if filtered_df.empty:
-            return False, "", []
+            return False, "", [], []
 
-        table = create_data_table(f'modal-content-part-{column_selected}-{status}', filtered_df, 10)
+        csv_filename = f'{status}_on_{date.strftime('%Y-%m-%d')}_for_{selected_manager}.csv'
+        table = create_data_table(f'modal-content-part-date', filtered_df, csv_filename, 10)
+        download_button = html.Button('Download CSV', id='download-modal-date-table', n_clicks=0)
         modal_title = f"Found {len(filtered_df)} {status} vehicles on {date.strftime('%Y-%m-%d')}"
 
+    return True, modal_title, table, download_button
 
-    return True, modal_title, table
+@callback(Output('modal-content-part-total-unique', 'exportDataAsCsv'),
+         Input('download-modal-table-status-csv', 'n_clicks'),
+         prevent_initial_call=True)
+def download_csv(n_clicks):
+    if n_clicks > 0:
+        return True
+    return dash.no_update
+
+@callback(Output('modal-content-part-date', 'exportDataAsCsv'),
+            Input('download-modal-date-table', 'n_clicks'),
+            prevent_initial_call=True)
+def download_csv(n_clicks):
+    if n_clicks > 0:
+        return True
+    return dash.no_update
 
 @callback(
     Output('vehicle-view-graph-container', 'children'),
