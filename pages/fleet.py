@@ -83,11 +83,12 @@ def update_managerview_table_and_graph(tab, start_date, end_date, selected_compa
         pivot_columns = pivot_df.columns[1:]
         for col in pivot_columns:
             pivot_df[col] = pivot_df[col].apply(lambda x: round(x, 3))
-
-        table = create_data_table('main-table-all', pivot_df, table_page_size)
+        csv_filename = 'all_managers_from_' + start_date + '_to_' + end_date + '.csv'
+        table = create_data_table('main-table-all', pivot_df, csv_filename, table_page_size)
+        download_button = html.Button('Download CSV', id='download-main-table-all-csv', n_clicks=0)
         fig = create_line_graph(agg_df, count_proportion_radio) # There is also an option for a grouped bar graph
 
-        return [fig, table]
+        return [fig, table, download_button]
 
     else:
 
@@ -104,10 +105,26 @@ def update_managerview_table_and_graph(tab, start_date, end_date, selected_compa
         manager_pivot_df = manager_pivot_df.merge(total_unique_per_status, on='status', how='left')
         manager_pivot_df.columns = manager_pivot_df.columns.astype(str)
 
-        table = create_data_table('main-table-part', manager_pivot_df, table_page_size)
+        csv_filename = selected_manager + '_from_' + start_date + '_to_' + end_date + '.csv'
+        table = create_data_table('main-table-part', manager_pivot_df, csv_filename, table_page_size)
+        download_button = html.Button('Download CSV', id='download-main-table-part-csv', n_clicks=0)
         fig = create_line_graph(manager_agg_df, count_proportion_radio)
 
-        return [fig, table]
+        return [fig, table, download_button]
+    
+@callback(Output('main-table-all', 'exportDataAsCsv'),
+         [Input('download-main-table-all-csv', 'n_clicks')])
+def download_csv(n_clicks):
+    if n_clicks > 0:
+        return True
+    return dash.no_update
+
+@callback(Output('main-table-part', 'exportDataAsCsv'),
+            [Input('download-main-table-part-csv', 'n_clicks')])
+def download_csv(n_clicks):
+    if n_clicks > 0:
+        return True
+    return dash.no_update
 
 
 @callback(
@@ -143,7 +160,7 @@ def update_modal_all(clicked_cell, clicked_row, companies, start_date, end_date,
         status_df.drop(['date', 'status', 'date_diff', 'status_change', 'group'], axis=1, inplace=True)
         status_df.drop_duplicates(subset=['plate'], inplace=True)
         modal_title = f"Overview of {len(status_df)} vehicles that have been, at some point, in {status} status between {start_date} and {end_date}"
-        table = create_data_table(f'modal-content-all-overview-{status}', status_df, 10)
+        table = create_data_table(f'modal-content-all-overview-{status}', status_df, "", 10)
 
         return True, modal_title, table
     
@@ -157,7 +174,7 @@ def update_modal_all(clicked_cell, clicked_row, companies, start_date, end_date,
         if filtered_df.empty:
             return False, "", []
 
-        table = create_data_table(f'modal-content-all-{column_selected}-{status}', filtered_df, 10)
+        table = create_data_table(f'modal-content-all-{column_selected}-{status}', filtered_df, "", 10)
         modal_title = f"Found {len(filtered_df)} {status} vehicles on {date.strftime('%Y-%m-%d')}"
 
 
@@ -201,7 +218,7 @@ def update_modal_part(clicked_cell, clicked_row, companies, start_date, end_date
         status_df.drop(['date','status', 'date_diff', 'status_change', 'group'], axis=1, inplace=True)
         status_df.drop_duplicates(subset=['plate'], inplace=True)
         modal_title = f"Overview of {len(status_df)} vehicles that have been, at some point, in {status} status between {start_date} and {end_date}"
-        table = create_data_table(f'modal-content-part-overview-{status}', status_df, 10)
+        table = create_data_table(f'modal-content-part-overview-{status}', status_df, "", 10)
 
         return True, modal_title, table
     
