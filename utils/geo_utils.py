@@ -15,12 +15,17 @@ BASE_URL = "http://localhost:8989/isochrone"
 def geoencode_address(address: str, province: str, postal_code: str):
     """ Get coordinates from Nominatim API, assuming the address is in Spain """
     address += f", {province}, {postal_code}, España"
+    headers = {'User-Agent': 'AuroPulse/1.0 (ctrebbau@pm.me)'}  # Custom user agent
     params = {'q': address, 'format': 'json'}
-    response = req.get('https://nominatim.openstreetmap.org/search', params=params)
-    data = response.json()
-    if not data:
+    response = req.get('https://nominatim.openstreetmap.org/search', headers=headers, params=params)
+    try:
+        data = response.json()
+        if not data:
+            return None
+        return data[0]['lat'], data[0]['lon']
+    except json.JSONDecodeError:
+        print(f'Failed to decode JSON from response. Status Code: {response.status_code}, Response Text: {response.text}')
         return None
-    return data[0]['lat'], data[0]['lon']
 
 def calculate_isochrones(lat: float, lon: float, times: list) -> dict:
     """Fetch isochrones for specified times."""
