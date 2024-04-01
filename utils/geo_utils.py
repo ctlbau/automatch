@@ -15,7 +15,7 @@ BASE_URL = "http://localhost:8989/isochrone"
 def geoencode_address(address: str, province: str, postal_code: str):
     """ Get coordinates from Nominatim API, assuming the address is in Spain """
     address += f", {province}, {postal_code}, España"
-    headers = {'User-Agent': 'AuroPulse/1.0 (ctrebbau@pm.me)'}  # Custom user agent
+    headers = {'User-Agent': 'AuroPulse/1.0 (ctrebbau@pm.me)'}
     params = {'q': address, 'format': 'json'}
     response = req.get('https://nominatim.openstreetmap.org/search', headers=headers, params=params)
     try:
@@ -74,6 +74,8 @@ def partition_drivers_by_isochrones(drivers_gdf, isochrones):
     """
     partitioned_drivers = []
     remaining_drivers = drivers_gdf.copy()
+    # make remaining_drivers unique
+    remaining_drivers = remaining_drivers.drop_duplicates(subset=['driver_id'])
     isochrone_geoms = extract_geometries_from_feature_collection(isochrones)
     for isochrone in isochrone_geoms:
         isochrone_geom = shape(isochrone)
