@@ -7,23 +7,27 @@ import dash_auth
 from dotenv import load_dotenv
 import os
 import json
-# Import your page layouts and callbacks
+from flask import Flask
+
 load_dotenv('.env')
-users = json.loads(os.getenv("USERS"))
+USERS = json.loads(os.getenv("USERS"))
+FLASK_KEY = os.getenv("FLASK_KEY")
 
 # Choose a theme from https://bootswatch.com/ or use the default Bootstrap theme
+server = Flask(__name__)
+server.secret_key = FLASK_KEY
+
 app = dash.Dash(
-    __name__, 
+    __name__,
+    server=server,
     external_stylesheets=[dbc.themes.SPACELAB, 'https://codepen.io/chriddyp/pen/bWLwgP.css'],
     use_pages=True,
     suppress_callback_exceptions=True
                 )
 
-server = app.server
-
 auth = dash_auth.BasicAuth(
     app,
-    users
+    USERS
 )
 
 
@@ -89,6 +93,5 @@ app.layout = dbc.Container([
 fluid=True,
 )
 
-
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=False, port=8050)
