@@ -178,7 +178,7 @@ def update_modal_all(clicked_cell, clicked_row, companies, start_date, end_date,
             return False, "", [], []
 
         modal_title = f"Found {len(filtered_df)} {status} vehicles on {date.strftime('%Y-%m-%d')}"
-        csv_filename = f'{status}_on_{date.strftime('%Y-%m-%d')}.csv'
+        csv_filename = f"{status}_on_{date.strftime('%Y-%m-%d')}.csv"
         table = create_data_table(f'modal-content-status', filtered_df, csv_filename, 10)
         download_button = html.Button('Download CSV', id='download-modal-table-status-csv', n_clicks=0)
 
@@ -256,7 +256,7 @@ def update_modal_part(clicked_cell, clicked_row, companies, start_date, end_date
         if filtered_df.empty:
             return False, "", [], []
 
-        csv_filename = f'{status}_on_{date.strftime('%Y-%m-%d')}_for_{selected_manager}.csv'
+        csv_filename = f"{status}_on_{date.strftime('%Y-%m-%d')}_for_{selected_manager}.csv"
         table = create_data_table(f'modal-content-part-date', filtered_df, csv_filename, 10)
         download_button = html.Button('Download CSV', id='download-modal-date-table', n_clicks=0)
         modal_title = f"Found {len(filtered_df)} {status} vehicles on {date.strftime('%Y-%m-%d')}"
