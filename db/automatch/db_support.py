@@ -14,7 +14,6 @@ def fetch_managers():
     engine = connect(localauth)
     query = text("SELECT id, name FROM Managers;")
     managers_df = pd.read_sql(query, engine)
-    # order the managers by name
     managers_df = managers_df.sort_values(by='name')
     return managers_df
 
@@ -25,9 +24,11 @@ def fetch_shifts():
     return shifts_df
 
 def fetch_provinces():
+    provinces = ["Madrid", "Málaga", "Barcelona", "Valencia", "Sevilla"]
     engine = connect(localauth)
     query = text("SELECT id, name FROM Provinces;")
     provinces_df = pd.read_sql(query, engine)
+    provinces_df = provinces_df[provinces_df["name"].isin(provinces)]
     return provinces_df
 
 def fetch_drivers(province_id):
