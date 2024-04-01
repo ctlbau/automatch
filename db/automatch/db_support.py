@@ -14,6 +14,8 @@ def fetch_managers():
     engine = connect(localauth)
     query = text("SELECT id, name FROM Managers;")
     managers_df = pd.read_sql(query, engine)
+    # order the managers by name
+    managers_df = managers_df.sort_values(by='name')
     return managers_df
 
 def fetch_shifts():
