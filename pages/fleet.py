@@ -321,7 +321,7 @@ def set_in_managerview_manager_and_status_dropdown(tab):
     manager_options = [
             {'label': manager, 'value': manager} for manager in managers['name']
             ]
-    manager_options.append({'label': 'All Managers', 'value': 'all'})
+    manager_options.insert(0, {'label': 'All Managers', 'value': 'all'})
 
     if tab != 'manager-tab':
         return [], []
