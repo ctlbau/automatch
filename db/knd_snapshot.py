@@ -30,7 +30,7 @@ def synchronize_exchange_locations(exchange_locations=exchange_locations):
             kendra_location_keys = {row['exchange_location'] for row in result.mappings() if row['exchange_location'] is not None}
         
         with local_engine.begin() as conn:
-            # Retrieve current location names from your ExchangeLocations table
+            # Retrieve current location names from local ExchangeLocations table
             current_locations_result = conn.execute(text("SELECT name FROM ExchangeLocations;"))
             current_locations = {row['name'] for row in current_locations_result.mappings()}
 
