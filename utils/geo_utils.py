@@ -3,7 +3,6 @@ import json
 import requests as req
 import pandas as pd
 import geopandas as gpd
-from db.db_connect import connect, localauth
 from shapely.geometry import shape
 
 GRAPHHOPPER_URL = "http://localhost:8989/isochrone"
