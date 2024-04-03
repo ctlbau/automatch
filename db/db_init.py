@@ -4,9 +4,9 @@ from sqlalchemy import text
 def create_autopulse_db():
     engine = connect({**localauth, 'database': None})
     if engine:
-        with engine.begin() as conn:  # Use a transaction
+        with engine.begin() as conn:
             conn.execute(text("CREATE DATABASE IF NOT EXISTS autopulse;"))
-        localauth['database'] = 'autopulse'  # Update localauth to use the new database
+        localauth['database'] = 'autopulse'  
 
 def create_managers_table():
     engine = connect(localauth)
@@ -42,17 +42,25 @@ def create_center_table():
                 );
             """))
 
-def create_companies_centers_table():
+def create_shifts_table():
     engine = connect(localauth)
     if engine:
         with engine.begin() as conn:
             conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS CompaniesCenters (
-                    company_id INT,
-                    center_id INT,
-                    PRIMARY KEY (company_id, center_id),
-                    FOREIGN KEY (company_id) REFERENCES Companies(id) ON DELETE CASCADE,
-                    FOREIGN KEY (center_id) REFERENCES Centers(id) ON DELETE CASCADE
+                CREATE TABLE IF NOT EXISTS Shifts (
+                    id INT PRIMARY KEY,
+                    name VARCHAR(70)
+                );
+            """))
+
+def create_provinces_table():
+    engine = connect(localauth)
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS Provinces (
+                    id INT PRIMARY KEY,
+                    name VARCHAR(100)
                 );
             """))
 
@@ -65,6 +73,20 @@ def create_exchange_location_table():
                 CREATE TABLE IF NOT EXISTS ExchangeLocations (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     name VARCHAR(100) UNIQUE NOT NULL
+                );
+            """))
+
+def create_companies_centers_table():
+    engine = connect(localauth)
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS CompaniesCenters (
+                    company_id INT,
+                    center_id INT,
+                    PRIMARY KEY (company_id, center_id),
+                    FOREIGN KEY (company_id) REFERENCES Companies(id) ON DELETE CASCADE,
+                    FOREIGN KEY (center_id) REFERENCES Centers(id) ON DELETE CASCADE
                 );
             """))
 
@@ -113,27 +135,6 @@ def create_drivers_table():
                 );
             """))
 
-def create_shifts_table():
-    engine = connect(localauth)
-    if engine:
-        with engine.begin() as conn:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS Shifts (
-                    id INT PRIMARY KEY,
-                    name VARCHAR(70)
-                );
-            """))
-
-def create_provinces_table():
-    engine = connect(localauth)
-    if engine:
-        with engine.begin() as conn:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS Provinces (
-                    id INT PRIMARY KEY,
-                    name VARCHAR(100)
-                );
-            """))
 
 def create_drivers_vehicles_table():
     engine = connect(localauth)
