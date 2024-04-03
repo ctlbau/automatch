@@ -1,38 +1,48 @@
+import os
 import pandas as pd
 import geopandas as gpd
-from db.db_connect import connect, kndauth, localauth, companies
+
 from sqlalchemy import text
 import json
+from db.db_connect import localauth_dev, localauth_stg, localauth_prod, connect
+
+app_env = os.getenv("APP_ENV", "dev")
+if app_env == 'stg':
+    database = localauth_stg
+elif app_env == 'dev':
+    database = localauth_dev
+else:
+    database = localauth_prod
 
 def fetch_centers():
-    engine = connect(localauth)
+    engine = connect(database)
     query = text("SELECT id, name FROM Centers;")
     centers_df = pd.read_sql(query, engine)
     return centers_df
 
 def fetch_managers():
-    engine = connect(localauth)
+    engine = connect(database)
     query = text("SELECT id, name FROM Managers;")
     managers_df = pd.read_sql(query, engine)
     managers_df = managers_df.sort_values(by='name')
     return managers_df
 
 def fetch_shifts():
-    engine = connect(localauth)
+    engine = connect(database)
     query = text("SELECT id, name FROM Shifts;")
     shifts_df = pd.read_sql(query, engine)
     return shifts_df
 
 def fetch_provinces():
     provinces = ["Madrid", "Málaga", "Barcelona", "Valencia", "Sevilla"]
-    engine = connect(localauth)
+    engine = connect(database)
     query = text("SELECT id, name FROM Provinces;")
     provinces_df = pd.read_sql(query, engine)
     provinces_df = provinces_df[provinces_df["name"].isin(provinces)]
     return provinces_df
 
 def fetch_drivers(province_id):
-    engine = connect(localauth)
+    engine = connect(database)
     # Updated query to join with Provinces table and select province name
     query = text("""SELECT
                         match1.driver_id,
@@ -64,7 +74,7 @@ def fetch_drivers(province_id):
                             C.name AS center
                         FROM
                             Drivers D
-                            JOIN DriversVehicles DV ON D.kendra_id = DV.driver_id
+                            JOIN DriversVehiclesExchangeLocations DV ON D.kendra_id = DV.driver_id
                             JOIN Vehicles V ON DV.vehicle_id = V.kendra_id
                             LEFT JOIN ExchangeLocations EL ON DV.exchange_location_id = EL.id
                             LEFT JOIN Provinces P ON D.province_id = P.id  -- Joining with Provinces table
@@ -80,7 +90,7 @@ def fetch_drivers(province_id):
                             DV.vehicle_id
                         FROM
                             Drivers D
-                            JOIN DriversVehicles DV ON D.kendra_id = DV.driver_id
+                            JOIN DriversVehiclesExchangeLocations DV ON D.kendra_id = DV.driver_id
                     ) AS match2 ON match1.vehicle_id = match2.vehicle_id AND match1.driver_id != match2.driver_id
                     GROUP BY
                         match1.driver_id, match1.driver, match1.street, match1.lat, match1.lng, match1.vehicle_id, match1.manager, match1.shift, match1.center, match1.province, match1.exchange_location

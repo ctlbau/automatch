@@ -13,7 +13,23 @@ kndauth = {
     "dbname": os.environ['KND_NAME']
 }
 
-localauth = {
+localauth_dev = {
+    "dialect": "mysql+pymysql",
+    "username": "ctl",
+    "password": os.environ['MYSQL_CTL_PWD'],
+    "host": "localhost",
+    "dbname": "pulse_dev"
+}
+
+localauth_stg = {
+    "dialect": "mysql+pymysql",
+    "username": "ctl",
+    "password": os.environ['MYSQL_CTL_PWD'],
+    "host": "localhost",
+    "dbname": "pulse_stg"
+}
+
+localauth_prod = {
     "dialect": "mysql+pymysql",
     "username": "ctl",
     "password": os.environ['MYSQL_CTL_PWD'],
@@ -21,9 +37,13 @@ localauth = {
     "dbname": "autopulse"
 }
 
+def get_url(auth):
+    """Construct the database URL from auth dictionary."""
+    return f"{auth['dialect']}://{auth['username']}:{auth['password']}@{auth['host']}/{auth['dbname']}"
+
 def connect(auth):
     try:
-        db_url = f"{auth['dialect']}://{auth['username']}:{auth['password']}@{auth['host']}/{auth['dbname']}"
+        db_url = get_url(auth)
         engine = create_engine(db_url)
         # Attempt to connect to the database to validate connection parameters
         with engine.connect() as conn:
