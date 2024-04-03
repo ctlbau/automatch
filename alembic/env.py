@@ -1,13 +1,33 @@
+import os
+import sys
 from logging.config import fileConfig
+from db.db_connect import localauth_dev, localauth_stg, localauth_prod
+
+
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
 
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
+def get_url(auth):
+    """Construct the database URL from auth dictionary."""
+    return f"{auth['dialect']}://{auth['username']}:{auth['password']}@{auth['host']}/{auth['dbname']}"
+
+app_env = os.getenv("APP_ENV", "dev")
+if app_env == 'stg':
+    database_url = get_url(localauth_stg)
+elif app_env == 'dev':
+    database_url = get_url(localauth_dev)
+else:
+    database_url = get_url(localauth_prod)
+
 config = context.config
+config.set_main_option("sqlalchemy.url", database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
