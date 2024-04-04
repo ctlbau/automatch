@@ -350,7 +350,7 @@ def delete_absent_drivers():
         result_knd = conn_knd.execute(text(knd_driver_ids_query))
         knd_driver_ids = set([row[0] for row in result_knd.fetchall()])
 
-    # Connect to the database database and fetch all driver IDs
+    # Connect to localauth and fetch all driver IDs
     engine_local = connect(localauth)
     local_driver_ids_query = "SELECT kendra_id FROM Drivers"
     with engine_local.connect() as conn_local:
@@ -364,9 +364,16 @@ def delete_absent_drivers():
     # Delete absent drivers from the database database
     delete_driver_query = "DELETE FROM Drivers WHERE kendra_id = :kendra_id"
     with engine_local.connect() as conn_local:
-        for driver_id in absent_driver_ids:
-            conn_local.execute(text(delete_driver_query), {'kendra_id': driver_id})
-            deleted_drivers_count += 1
+        transaction = conn_local.begin()  # Start a new transaction
+        try:
+            for driver_id in absent_driver_ids:
+                conn_local.execute(text(delete_driver_query), {'kendra_id': driver_id})
+                deleted_drivers_count += 1
+            transaction.commit()  # Commit the transaction if no errors occurred
+        except Exception as e:
+            transaction.rollback()  # Roll back the transaction in case of error
+            print(f"An error occurred: {e}")  # Log or print the error
+            raise  # Re-raise the exception to handle it or log it as needed
 
     print(f"Deleted {deleted_drivers_count} absent drivers from the local database.")
 
