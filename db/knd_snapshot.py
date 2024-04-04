@@ -5,13 +5,17 @@ from db_connect import localauth_dev, localauth_stg, localauth_prod, companies, 
 from sqlalchemy import text
 import numpy as np
 
+from dotenv import load_dotenv
+
+load_dotenv('/Users/ctl/dev/automatch/.env')
+
 app_env = os.getenv("APP_ENV", "dev")
 if app_env == 'stg':
-    database = localauth_stg
+    localauth = localauth_stg
 elif app_env == 'dev':
-    database = localauth_dev
+    localauth = localauth_dev
 else:
-    database = localauth_prod
+    localauth = localauth_prod
 
 def get_vehicle_stati():
     engine = connect(kndauth)
@@ -61,7 +65,7 @@ exchange_locations = {
 def synchronize_exchange_locations(exchange_locations=exchange_locations):
 
     kendra_engine = connect(kndauth)
-    local_engine = connect(database)
+    local_engine = connect(localauth)
     
     if kendra_engine and local_engine:
         # Retrieve unique exchange location keys from Kendra
@@ -90,10 +94,10 @@ def synchronize_exchange_locations(exchange_locations=exchange_locations):
                     current_locations.add(location_name)
 
 
-def fetch_and_insert_drivers_vehicles(kndauth, database):
+def fetch_and_insert_drivers_vehicles(kndauth, localauth):
 
     engine_knd = connect(kndauth)
-    engine_local = connect(database)
+    engine_local = connect(localauth)
     
     select_query = text("""
                         SELECT
@@ -177,7 +181,7 @@ def get_or_create_exchange_location(conn, location_key):
 
 
 def ensure_managers_exist(manager_df):
-    engine = connect(localauth_dev)
+    engine = connect(localauth)
     with engine.connect() as con:
         for _, row in manager_df.iterrows():
             check_query = text("SELECT COUNT(*) FROM Managers WHERE id = :manager_id")
@@ -187,7 +191,7 @@ def ensure_managers_exist(manager_df):
                 con.execute(insert_query, {'manager_id': row['manager_id'], 'manager': row['manager']})
 
 def ensure_companies_exist(df):
-    engine = connect(localauth_dev)
+    engine = connect(localauth)
     with engine.connect() as con:
         unique_companies = df[['company_id', 'company']].drop_duplicates()
         for _, row in unique_companies.iterrows():
@@ -198,7 +202,7 @@ def ensure_companies_exist(df):
                 con.execute(insert_query, {'company_id': row['company_id'], 'company': row['company']})
 
 def ensure_centers_exist(df):
-    engine = connect(localauth_dev)
+    engine = connect(localauth)
     with engine.connect() as con:
         unique_centers = df[['center_id', 'center']].drop_duplicates()
         for _, row in unique_centers.iterrows():
@@ -228,7 +232,7 @@ def delete_absent_managers():
                                             e2.id;"""))
         knd_manager_ids = set([row[0] for row in result_knd.fetchall()])
 
-    engine_local = connect(localauth_dev)
+    engine_local = connect(localauth)
     with engine_local.connect() as con_local:
         result_local = con_local.execute(text("SELECT id FROM Managers"))
         local_manager_ids = set([row[0] for row in result_local.fetchall()])
@@ -253,7 +257,7 @@ def delete_absent_managers():
 
         print(f"Completed checking and deleting absent managers from local database. Total managers purged: {purged_managers_count}.")
 
-def insert_vehicle_data(df, engine=connect(database)):
+def insert_vehicle_data(df, engine=connect(localauth)):
     df['date'] = pd.to_datetime(datetime.now().date())
 
     # Convert NaN values to None for the entire DataFrame
@@ -285,7 +289,7 @@ def insert_vehicle_data(df, engine=connect(database)):
         con.commit()
         print(f"Successful insertion of {len(df)} rows into Vehicles table.")
 
-def fetch_and_insert_shift_data(kndauth, database):
+def fetch_and_insert_shift_data(kndauth, localauth):
     select_query = text("""SELECT s.id AS shift_id, s.name AS name FROM shift s ORDER BY s.id;""")
     insert_query = text("""INSERT IGNORE INTO Shifts (id, name) VALUES (:id, :name);""")
 
@@ -294,14 +298,14 @@ def fetch_and_insert_shift_data(kndauth, database):
         result = knd_conn.execute(select_query)
         shifts = result.fetchall()
     
-    engine_local = connect(database)
+    engine_local = connect(localauth)
     with engine_local.connect() as local_conn:
         for shift in shifts:
             local_conn.execute(insert_query, {'id': shift[0], 'name': shift[1]})
         local_conn.commit()
         print("Shifts data inserted successfully")
 
-def fetch_and_insert_provinces(kndauth, database):
+def fetch_and_insert_provinces(kndauth, localauth):
     select_query = text("""SELECT p.id, p.name FROM province p ORDER BY p.id;""")
     # Correct the placeholders to use named parameters
     insert_query = text("""INSERT IGNORE INTO Provinces (id, name) VALUES (:id, :name);""")
@@ -311,7 +315,7 @@ def fetch_and_insert_provinces(kndauth, database):
         result = knd_conn.execute(select_query)
         provinces = result.fetchall()
     
-    engine_local = connect(database)
+    engine_local = connect(localauth)
     with engine_local.connect() as local_conn:
         for province in provinces:
             # Pass parameters as a dictionary matching the named placeholders
@@ -347,7 +351,7 @@ def delete_absent_drivers():
         knd_driver_ids = set([row[0] for row in result_knd.fetchall()])
 
     # Connect to the database database and fetch all driver IDs
-    engine_local = connect(database)
+    engine_local = connect(localauth)
     local_driver_ids_query = "SELECT kendra_id FROM Drivers"
     with engine_local.connect() as conn_local:
         result_local = conn_local.execute(text(local_driver_ids_query))
@@ -366,7 +370,7 @@ def delete_absent_drivers():
 
     print(f"Deleted {deleted_drivers_count} absent drivers from the local database.")
 
-def fetch_and_insert_drivers(kndauth, database, manager_df):
+def fetch_and_insert_drivers(kndauth, localauth, manager_df):
     manager_ids = manager_df['manager_id'].tolist()
     placeholders = ','.join([':manager_id_' + str(i) for i in range(len(manager_ids))])
     parameters = {'manager_id_' + str(i): manager_id for i, manager_id in enumerate(manager_ids)}
@@ -417,7 +421,7 @@ def fetch_and_insert_drivers(kndauth, database, manager_df):
         result = knd_conn.execute(select_query, parameters)
         drivers = result.fetchall()
     
-    engine_local = connect(database)
+    engine_local = connect(localauth)
     with engine_local.connect() as local_conn:
         for driver in drivers:
             local_conn.execute(insert_query, {
@@ -437,8 +441,6 @@ def fetch_and_insert_drivers(kndauth, database, manager_df):
         print("Drivers data inserted successfully")
 
 
-
-
 if __name__ == "__main__":
     df, manager_df = get_vehicle_stati()
     ensure_managers_exist(manager_df)
@@ -447,9 +449,9 @@ if __name__ == "__main__":
     ensure_centers_exist(df)
     insert_vehicle_data(df)
     delete_absent_drivers()
-    fetch_and_insert_shift_data(kndauth, database)
-    fetch_and_insert_provinces(kndauth, database)
-    fetch_and_insert_drivers(kndauth, database, manager_df)
+    fetch_and_insert_shift_data(kndauth, localauth)
+    fetch_and_insert_provinces(kndauth, localauth)
+    fetch_and_insert_drivers(kndauth, localauth, manager_df)
     synchronize_exchange_locations()
-    fetch_and_insert_drivers_vehicles(kndauth, database)
-    fetch_and_insert_drivers(kndauth, database, manager_df)
+    fetch_and_insert_drivers_vehicles(kndauth, localauth)
+    fetch_and_insert_drivers(kndauth, localauth, manager_df)
