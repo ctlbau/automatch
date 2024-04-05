@@ -83,7 +83,7 @@ def fetch_drivers(province_id):
                         FROM
                             Drivers D
                             JOIN DriversVehiclesExchangeLocations DV ON D.kendra_id = DV.driver_id
-                            JOIN Vehicles V ON DV.vehicle_id = V.kendra_id
+                            JOIN Vehicles V ON DV.vehicle_id = V.kendra_id AND V.date = CURRENT_DATE
                             LEFT JOIN ExchangeLocations EL ON DV.exchange_location_id = EL.id
                             LEFT JOIN Provinces P ON D.province_id = P.id  -- Joining with Provinces table
                             JOIN Managers M ON D.manager_id = M.id
