@@ -4,7 +4,7 @@ from dash_deck import DeckGL
 from dash import html, dcc, callback, ALL, MATCH
 import pydeck as pdk
 from utils.geo_utils import geoencode_address, calculate_isochrones, partition_drivers_by_isochrones, extract_coords_from_encompassing_isochrone, check_partitions_intersection
-from db.automatch import fetch_drivers, fetch_shifts, fetch_managers, fetch_centers, fetch_provinces
+from db.automatch import fetch_drivers, fetch_shifts, fetch_managers, fetch_centers, fetch_provinces, fetch_exchange_locations
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
@@ -65,6 +65,13 @@ layout = html.Div([
             id='center-dropdown',
             options=[{'label': center['name'], 'value': center['name']} for center in fetch_centers().to_dict('records')],
             placeholder='Select a center',
+            multi=True,
+            style={'marginBottom': '10px'}
+        ),
+        dcc.Dropdown(  # Dropdown for exchange location selection
+            id='exchange-locations-dropdown',
+            options=[{'label': exchange_location['name'], 'value': exchange_location['name']} for exchange_location in fetch_exchange_locations().to_dict('records')],
+            placeholder='Select an exchange location',
             multi=True,
             style={'marginBottom': '10px'}
         ),
@@ -134,14 +141,14 @@ layout = html.Div([
 
 @callback(
     [Output('map', 'data'), Output('data-tables-container', 'children'), Output('alert-fail-geoencode', 'is_open')],
-    [Input('submit-val', 'n_clicks'), Input('shifts-dropdown', 'value'), Input('managers-dropdown', 'value'), Input('is-matched-radio', 'value'), Input('center-dropdown', 'value')],
+    [Input('submit-val', 'n_clicks'), Input('shifts-dropdown', 'value'), Input('managers-dropdown', 'value'), Input('is-matched-radio', 'value'), Input('center-dropdown', 'value'), Input('exchange-locations-dropdown', 'value')],
     [State('street-input', 'value'),
      State('province-dropdown', 'options'),
      State('province-dropdown', 'value'),
      State('zip-code-input', 'value'),
      State('time-limit-range-slider', 'value')]
 )
-def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_matched_filter, selected_center, street, selected_province, province_id, postal_code, time_limits):
+def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_matched_filter, selected_center, exchange_locations, street, selected_province, province_id, postal_code, time_limits):
     if n_clicks > 0:
         province = [province for province in selected_province if province['value'] == province_id][0]['label']
         geoencode_result = geoencode_address(street, province, postal_code)
@@ -175,6 +182,10 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
             if selected_center:
                 drivers_list = [driver for driver in drivers_list if driver['center'] in selected_center]
                 drivers_gdf = drivers_gdf[drivers_gdf['center'].isin(selected_center)]
+            
+            if exchange_locations:
+                drivers_list = [driver for driver in drivers_list if driver['exchange_location'] in exchange_locations]
+                drivers_gdf = drivers_gdf[drivers_gdf['exchange_location'].isin(exchange_locations)]
 
             # Define icon data
             icon_data = {
