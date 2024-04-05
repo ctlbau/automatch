@@ -94,12 +94,14 @@ def synchronize_exchange_locations(exchange_locations=exchange_locations):
                     current_locations.add(location_name)
 
 
-def fetch_and_insert_drivers_vehicles(kndauth, localauth):
 
+
+def sync_driver_vehicle_relationships(kndauth, localauth):
     engine_knd = connect(kndauth)
     engine_local = connect(localauth)
     
-    select_query = text("""
+    # Step 1: Fetch current state from both databases
+    knd_query = text("""
                         SELECT
                             e.id AS driver_id,
                             v.id AS vehicle_id,
@@ -120,34 +122,53 @@ def fetch_and_insert_drivers_vehicles(kndauth, localauth):
                         ORDER BY
                             e.id, v.id;
                         """)
-
-    with engine_knd.connect() as knd_conn, engine_local.connect() as local_conn:
-        result = knd_conn.execute(select_query)
-        for row in result.mappings():
-
-            location_key = row['exchange_location']
-            exchange_location_id = get_or_create_exchange_location(local_conn, location_key)
-
-            local_conn.execute(text("""
+    local_query = text("SELECT driver_id, vehicle_id, exchange_location_id FROM DriversVehiclesExchangeLocations")
+    
+    with engine_knd.connect() as conn_knd:
+        knd_triples = set(conn_knd.execute(knd_query).fetchall())
+    
+    with engine_local.connect() as conn_local:
+        local_triples = set(conn_local.execute(local_query).fetchall())
+    
+    # Step 2: Identify differences
+    to_delete = local_triples - knd_triples
+    to_insert = knd_triples - local_triples
+    
+    # Step 3: Update localauth
+    # Delete outdated triples
+    with engine_local.connect() as conn_local:
+        for triple in to_delete:
+            delete_query = text("""
+                DELETE FROM DriversVehiclesExchangeLocations 
+                WHERE driver_id = :driver_id AND vehicle_id = :vehicle_id AND exchange_location_id = :exchange_location_id
+            """)
+            conn_local.execute(delete_query, {'driver_id': triple[0], 'vehicle_id': triple[1], 'exchange_location_id': triple[2]})
+        
+        # Insert new triples
+        for triple in to_insert:
+            # Map exchange_location to exchange_location_id
+            exchange_location_id = get_or_create_exchange_location(conn_local, triple[2])
+            insert_query = text("""
                 INSERT INTO DriversVehiclesExchangeLocations (driver_id, vehicle_id, exchange_location_id)
                 SELECT :driver_id, :vehicle_id, :exchange_location_id
-                FROM dual
                 WHERE EXISTS (
                     SELECT 1 FROM Drivers d WHERE d.kendra_id = :driver_id
                 ) AND EXISTS (
                     SELECT 1 FROM Vehicles v WHERE v.kendra_id = :vehicle_id
                 )
                 ON DUPLICATE KEY UPDATE
-                driver_id = VALUES(driver_id),
-                vehicle_id = VALUES(vehicle_id),
                 exchange_location_id = VALUES(exchange_location_id);
-            """), {
-                'driver_id': row['driver_id'], 
-                'vehicle_id': row['vehicle_id'],
+            """)
+            conn_local.execute(insert_query, {
+                'driver_id': triple[0], 
+                'vehicle_id': triple[1],
                 'exchange_location_id': exchange_location_id
             })
-        local_conn.commit()
-        print("DriversVehicles data inserted successfully.")
+    
+        conn_local.commit()
+    print("DriversVehicles data synchronized successfully.")
+
+
 
 
 def get_or_create_exchange_location(conn, location_key):
@@ -460,5 +481,5 @@ if __name__ == "__main__":
     fetch_and_insert_provinces(kndauth, localauth)
     fetch_and_insert_drivers(kndauth, localauth, manager_df)
     synchronize_exchange_locations()
-    fetch_and_insert_drivers_vehicles(kndauth, localauth)
+    sync_driver_vehicle_relationships(kndauth, localauth)
     fetch_and_insert_drivers(kndauth, localauth, manager_df)
