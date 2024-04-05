@@ -3,7 +3,6 @@ import pandas as pd
 import geopandas as gpd
 
 from sqlalchemy import text
-import json
 from db.db_connect import localauth_dev, localauth_stg, localauth_prod, connect
 
 app_env = os.getenv("APP_ENV", "dev")
@@ -18,12 +17,14 @@ def fetch_exchange_locations():
     engine = connect(database)
     query = text("SELECT id, name FROM ExchangeLocations;")
     exchange_locations_df = pd.read_sql(query, engine)
+    exchange_locations_df = exchange_locations_df.sort_values(by='name')
     return exchange_locations_df
 
 def fetch_centers():
     engine = connect(database)
     query = text("SELECT id, name FROM Centers;")
     centers_df = pd.read_sql(query, engine)
+    centers_df = centers_df.sort_values(by='name')
     return centers_df
 
 def fetch_managers():
@@ -37,6 +38,7 @@ def fetch_shifts():
     engine = connect(database)
     query = text("SELECT id, name FROM Shifts;")
     shifts_df = pd.read_sql(query, engine)
+    shifts_df = shifts_df.sort_values(by='name')
     return shifts_df
 
 def fetch_provinces():
@@ -45,11 +47,11 @@ def fetch_provinces():
     query = text("SELECT id, name FROM Provinces;")
     provinces_df = pd.read_sql(query, engine)
     provinces_df = provinces_df[provinces_df["name"].isin(provinces)]
+    provinces_df = provinces_df.sort_values(by='name')
     return provinces_df
 
 def fetch_drivers(province_id):
     engine = connect(database)
-    # Updated query to join with Provinces table and select province name
     query = text("""SELECT
                         match1.driver_id,
                         match1.driver,
