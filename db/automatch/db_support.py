@@ -14,6 +14,12 @@ elif app_env == 'dev':
 else:
     database = localauth_prod
 
+def fetch_exchange_locations():
+    engine = connect(database)
+    query = text("SELECT id, name FROM ExchangeLocations;")
+    exchange_locations_df = pd.read_sql(query, engine)
+    return exchange_locations_df
+
 def fetch_centers():
     engine = connect(database)
     query = text("SELECT id, name FROM Centers;")
