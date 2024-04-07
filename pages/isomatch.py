@@ -1,16 +1,14 @@
 import os
 import dash
 from dash_deck import DeckGL
-from dash import html, dcc, callback, ALL, MATCH
+from dash import html, dcc, callback, MATCH
 import pydeck as pdk
 from utils.geo_utils import geoencode_address, calculate_isochrones, partition_drivers_by_isochrones, extract_coords_from_encompassing_isochrone, check_partitions_intersection
 from db.automatch import fetch_drivers, fetch_shifts, fetch_managers, fetch_centers, fetch_provinces, fetch_exchange_locations
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
-from ui.components import create_navbar, create_data_table
-import pandas as pd
-import io
+from ui.components import create_data_table
 from datetime import datetime
 
 dash.register_page(__name__, path='/')

@@ -1,8 +1,6 @@
 import dash
 import dash_bootstrap_components as dbc
-from dash import dcc, html
-from dash.dependencies import Input, Output
-from ui.components import create_navbar
+from dash import html
 import dash_auth
 from dotenv import load_dotenv
 import os
