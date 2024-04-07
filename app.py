@@ -9,7 +9,10 @@ import os
 import json
 from flask import Flask
 
-load_dotenv('.env')
+thisdir = os.path.dirname(__file__)
+envdir = os.path.dirname(thisdir)
+load_dotenv(os.path.join(envdir, '.env'))
+
 USERS = json.loads(os.getenv("USERS"))
 FLASK_KEY = os.getenv("FLASK_KEY")
 

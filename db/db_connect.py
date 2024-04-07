@@ -3,7 +3,10 @@ from sqlalchemy import create_engine
 import os
 from dotenv import load_dotenv
 
-load_dotenv('/Users/ctl/dev/automatch/.env')
+thisdir = os.path.dirname(__file__)
+envdir = os.path.dirname(thisdir)
+
+load_dotenv(os.path.join(envdir, '.env'))
 
 kndauth = {
     "dialect": "mysql+pymysql",

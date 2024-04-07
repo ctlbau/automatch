@@ -6,8 +6,10 @@ from sqlalchemy import text
 import numpy as np
 
 from dotenv import load_dotenv
+thisdir = os.path.dirname(__file__)
+envdir = os.path.dirname(thisdir)
 
-load_dotenv('/Users/ctl/dev/automatch/.env')
+load_dotenv(os.path.join(envdir, '.env'))
 
 app_env = os.getenv("APP_ENV", "dev")
 if app_env == 'stg':
@@ -100,7 +102,7 @@ def sync_driver_vehicle_relationships(kndauth, localauth):
     engine_knd = connect(kndauth)
     engine_local = connect(localauth)
     
-    # Step 1: Fetch current state from both databases
+    # Fetch current state from both databases
     knd_query = text("""
                         SELECT
                             e.id AS driver_id,
@@ -124,49 +126,66 @@ def sync_driver_vehicle_relationships(kndauth, localauth):
                         """)
     local_query = text("SELECT driver_id, vehicle_id, exchange_location_id FROM DriversVehiclesExchangeLocations")
     
+    knd_triples = set()
+    local_triples = set()
+    
     with engine_knd.connect() as conn_knd:
         knd_triples = set(conn_knd.execute(knd_query).fetchall())
     
     with engine_local.connect() as conn_local:
         local_triples = set(conn_local.execute(local_query).fetchall())
     
-    # Step 2: Identify differences
+    # Identify differences
     to_delete = local_triples - knd_triples
     to_insert = knd_triples - local_triples
     
-    # Step 3: Update localauth
-    # Delete outdated triples
-    with engine_local.connect() as conn_local:
-        for triple in to_delete:
-            delete_query = text("""
-                DELETE FROM DriversVehiclesExchangeLocations 
-                WHERE driver_id = :driver_id AND vehicle_id = :vehicle_id AND exchange_location_id = :exchange_location_id
-            """)
-            conn_local.execute(delete_query, {'driver_id': triple[0], 'vehicle_id': triple[1], 'exchange_location_id': triple[2]})
-        
-        # Insert new triples
-        for triple in to_insert:
-            # Map exchange_location to exchange_location_id
-            exchange_location_id = get_or_create_exchange_location(conn_local, triple[2])
-            insert_query = text("""
-                INSERT INTO DriversVehiclesExchangeLocations (driver_id, vehicle_id, exchange_location_id)
-                SELECT :driver_id, :vehicle_id, :exchange_location_id
-                WHERE EXISTS (
-                    SELECT 1 FROM Drivers d WHERE d.kendra_id = :driver_id
-                ) AND EXISTS (
-                    SELECT 1 FROM Vehicles v WHERE v.kendra_id = :vehicle_id
-                )
-                ON DUPLICATE KEY UPDATE
-                exchange_location_id = VALUES(exchange_location_id);
-            """)
-            conn_local.execute(insert_query, {
-                'driver_id': triple[0], 
-                'vehicle_id': triple[1],
-                'exchange_location_id': exchange_location_id
-            })
-    
-        conn_local.commit()
-    print("DriversVehicles data synchronized successfully.")
+    # Update localauth
+    with engine_local.begin() as transaction:
+        try:
+            # Delete outdated triples
+            for triple in to_delete:
+                if triple[2] is None:
+                    # Handle NULL exchange_location_id explicitly
+                    delete_query = text("""
+                        DELETE FROM DriversVehiclesExchangeLocations 
+                        WHERE driver_id = :driver_id AND vehicle_id = :vehicle_id AND exchange_location_id IS NULL
+                    """)
+                    transaction.execute(delete_query, {'driver_id': triple[0], 'vehicle_id': triple[1]})
+                else:
+                    # Handle non-NULL exchange_location_id
+                    delete_query = text("""
+                        DELETE FROM DriversVehiclesExchangeLocations 
+                        WHERE driver_id = :driver_id AND vehicle_id = :vehicle_id AND exchange_location_id = :exchange_location_id
+                    """)
+                    transaction.execute(delete_query, {'driver_id': triple[0], 'vehicle_id': triple[1], 'exchange_location_id': triple[2]})
+            
+             # Insert new triples
+            for triple in to_insert:
+                # Map exchange_location to exchange_location_id
+                exchange_location_id = get_or_create_exchange_location(transaction, triple[2])  # Adjust this function call as needed
+                insert_query = text("""
+                    INSERT INTO DriversVehiclesExchangeLocations (driver_id, vehicle_id, exchange_location_id)
+                    SELECT :driver_id, :vehicle_id, :exchange_location_id
+                    WHERE EXISTS (
+                        SELECT 1 FROM Drivers d WHERE d.kendra_id = :driver_id
+                    ) AND EXISTS (
+                        SELECT 1 FROM Vehicles v WHERE v.kendra_id = :vehicle_id
+                    )
+                    ON DUPLICATE KEY UPDATE
+                    exchange_location_id = VALUES(exchange_location_id);
+                """)
+                transaction.execute(insert_query, {
+                    'driver_id': triple[0], 
+                    'vehicle_id': triple[1],
+                    'exchange_location_id': exchange_location_id
+                })
+
+            transaction.commit()
+            print("DriversVehicles data synchronized successfully.")
+        except Exception as e:
+            transaction.rollback()
+            print(f"An error occurred during synchronization: {e}")
+            raise
 
 
 
