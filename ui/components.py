@@ -1,5 +1,5 @@
 from dash import dcc, html
-from db.fleetpulse.db_support import *
+from db.fleetpulse.db_support import fetch_managers, fetch_statuses, fetch_date_range, fetch_centers
 from datetime import datetime, timedelta
 import dash_bootstrap_components as dbc
 import plotly.express as px
@@ -44,6 +44,31 @@ def create_company_filter(id):
             )
         ]
     )
+
+def create_filter(id, options, placeholder, multi=False):
+    return html.Nav(
+        className="navbar navbar-expand-lg mb-2",
+        children=[
+            html.Div(
+                className="container-fluid",
+                children=[
+                    html.Div(
+                        dcc.Dropdown(
+                            id=id,
+                            options=label_value_from_dict(options),
+                            value=[],
+                            multi=multi,
+                            clearable=True,
+                            placeholder=placeholder
+                        ), className="col-md-4 offset-md-4 col-12"
+                    )
+                ]
+            )
+        ]
+    )
+
+def label_value_from_dict(data):
+    return [{'label': data['name'], 'value': data['id']} for data in data]
 
 def create_status_filter(id):
     return html.Nav(
@@ -198,6 +223,8 @@ def create_modal(modal_id, title_id, content_id, footer_id):
     )
 
 def create_data_table(id, data, filename, page_size=10):
+    # remove _ from column names
+    data.columns = data.columns.str.replace('_', ' ')
     columnDefs = [{"field": i} for i in data.columns]
     grid = dag.AgGrid(
         id=id,

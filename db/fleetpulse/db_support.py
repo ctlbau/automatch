@@ -22,11 +22,18 @@ def fetch_managers():
     managers_df = managers_df.sort_values(by='name')
     return managers_df
 
+def fetch_centers():
+    engine = connect(database)
+    query = text("SELECT id, name FROM Centers;")
+    centers_df = pd.read_sql(query, engine)
+    centers_df = centers_df.sort_values(by='name')
+    return centers_df
+
 def fetch_statuses():
     engine = connect(database)
     query = text("SELECT DISTINCT status FROM Vehicles;")
     statuses_df = pd.read_sql(query, engine)
-    return statuses_df  # Return the DataFrame directly, without calling it
+    return statuses_df
 
 def fetch_date_range():
     engine = connect(database)
@@ -42,9 +49,15 @@ def fetch_plates():
     plates_df = pd.read_sql(query, engine)
     return plates_df
 
-def fetch_vehicles(company=companies["all"], from_date=None, to_date=None):
+def fetch_vehicles(centers, company=companies["all"], from_date=None, to_date=None):
     engine = connect(database)
     company_ids = ', '.join(map(str, companies[company]))
+
+    if centers:
+        center_ids = ', '.join(map(str, centers))
+        center_condition = f"AND V.center_id IN ({center_ids})"
+    else:
+        center_condition = ""
 
     date_condition = ""
     if from_date and to_date:
@@ -64,6 +77,7 @@ def fetch_vehicles(company=companies["all"], from_date=None, to_date=None):
         LEFT JOIN Centers CTR ON V.center_id = CTR.id
     WHERE
         V.company_id IN ({company_ids})
+        {center_condition}
         {date_condition};
     """
     df = pd.read_sql(text(query), engine)
