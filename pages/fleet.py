@@ -173,31 +173,31 @@ def download_csv(n_clicks):
     Output('details-modal-title-all', 'children'),
     Output('modal-content-all', 'children'),
     Output('modal-footer-all', 'children'),
-
     [
         Input('main-table-all', 'cellClicked'),
         State('main-table-all', 'selectedRows'),
         State('company-dropdown', 'value'),
+        State('center-dropdown', 'value'),
         State('date-picker-range', 'start_date'),
         State('date-picker-range', 'end_date'),
         State('status-dropdown', 'value'),
         State('count-proportion-radio', 'value'),
     ]
 )
-def update_modal_all(clicked_cell, clicked_row, companies, start_date, end_date, selected_statuses, count_proportion_radio):
+def update_modal_all(clicked_cell, clicked_row, companies, selected_centers, start_date, end_date, selected_statuses, count_proportion_radio):
     if not clicked_cell:
         return False, "", [], []
 
     column_selected = clicked_cell['colId']
     status = clicked_row[0]['status']
     
-    base_df = fetch_vehicles(company=companies, from_date=start_date, to_date=end_date)
+    base_df = fetch_vehicles(selected_centers, company=companies, from_date=start_date, to_date=end_date)
     if base_df is None or base_df.empty:
         return False, "", [], []
     
     status_df = base_df[base_df['status'] == status].copy()
 
-    if column_selected == 'total_unique':
+    if column_selected == 'total unique':
         streaks_df = calculate_status_periods(status_df)
         status_df = status_df.merge(streaks_df, on='plate', how='left')
         status_df.drop(['date', 'status', 'date_diff', 'status_change', 'group'], axis=1, inplace=True)
@@ -223,7 +223,6 @@ def update_modal_all(clicked_cell, clicked_row, companies, start_date, end_date,
         csv_filename = f"{status}_on_{date.strftime('%Y-%m-%d')}.csv"
         table = create_data_table(f'modal-content-status', filtered_df, csv_filename, 10)
         download_button = html.Button('Download CSV', id='download-modal-table-status-csv', n_clicks=0)
-
 
     return True, modal_title, table, download_button
 
@@ -253,6 +252,7 @@ def download_csv(n_clicks):
         Input('main-table-part', 'cellClicked'),
         State('main-table-part', 'selectedRows'),
         State('company-dropdown', 'value'),
+        State('center-dropdown', 'value'),
         State('date-picker-range', 'start_date'),
         State('date-picker-range', 'end_date'),
         State('status-dropdown', 'value'),
@@ -260,14 +260,14 @@ def download_csv(n_clicks):
         State('count-proportion-radio', 'value'),
     ]
 )
-def update_modal_part(clicked_cell, clicked_row, companies, start_date, end_date, selected_statuses, selected_manager, count_proportion_radio):
+def update_modal_part(clicked_cell, clicked_row, companies, selected_centers, start_date, end_date, selected_statuses, selected_manager, count_proportion_radio):
     if not clicked_cell:
         return False, "", [], []
 
     column_selected = clicked_cell['colId']
     status = clicked_row[0]['status']
     
-    base_df = fetch_vehicles(company=companies, from_date=start_date, to_date=end_date)
+    base_df = fetch_vehicles(selected_centers, company=companies, from_date=start_date, to_date=end_date)
     if base_df is None or base_df.empty:
         return False, "", [], []
     
@@ -275,7 +275,7 @@ def update_modal_part(clicked_cell, clicked_row, companies, start_date, end_date
     if selected_manager:
         status_df = status_df[status_df['manager'] == selected_manager]
 
-    if column_selected == 'total_unique':
+    if column_selected == 'total unique':
         streaks_df = calculate_status_periods(status_df)
         status_df = status_df.merge(streaks_df, on='plate', how='left')
         # status_df['date'] = status_df['date'].dt.strftime('%Y-%m-%d')
