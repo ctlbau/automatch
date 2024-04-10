@@ -45,7 +45,7 @@ def create_company_filter(id):
         ]
     )
 
-def create_filter(id, options, placeholder, multi=False):
+def create_dropdown(id, options, placeholder, multi=False):
     return html.Nav(
         className="navbar navbar-expand-lg mb-2",
         children=[
@@ -59,8 +59,9 @@ def create_filter(id, options, placeholder, multi=False):
                             value=[],
                             multi=multi,
                             clearable=True,
-                            placeholder=placeholder
-                        ), className="col-md-4 offset-md-4 col-12"
+                            placeholder=placeholder,
+                            style={'marginBottom': '10px'}
+                        ), className="col-md-3 offset-md-0 col-12",
                     )
                 ]
             )
