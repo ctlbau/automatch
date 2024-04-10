@@ -35,9 +35,11 @@ def fetch_managers():
     return managers_df
 
 def fetch_shifts():
+    shifts = ["L-J", "L-J (40h)", "Mañana", "Tarde", "TP-L-V", "TP-V-D"]
     engine = connect(database)
     query = text("SELECT id, name FROM Shifts;")
     shifts_df = pd.read_sql(query, engine)
+    shifts_df = shifts_df[shifts_df["name"].isin(shifts)]
     shifts_df = shifts_df.sort_values(by='name')
     return shifts_df
 
