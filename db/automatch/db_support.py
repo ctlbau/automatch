@@ -109,6 +109,7 @@ def fetch_drivers(province_id):
 
     # Execute the query with province_id as a parameter
     drivers_df = pd.read_sql(query, engine, params={"province_id": province_id})
+    drivers_df = drivers_df.where(pd.notnull(drivers_df), None)
     drivers_gdf = gpd.GeoDataFrame(drivers_df, geometry=gpd.points_from_xy(drivers_df.lng, drivers_df.lat), crs='EPSG:4326')
     drivers_list_dict = [
         {
