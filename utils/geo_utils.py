@@ -102,18 +102,30 @@ def get_manager_stats(df):
         total_drivers=('driver_id', 'count'),
         matched_drivers=('is_matched', 'sum'),
         unmatched_drivers=('is_matched', lambda x: (x == 0).sum()),
-        avg_distance=('distance', 'mean'),
-        min_distance=('distance', 'min'),
-        max_distance=('distance', 'max'),
+        avg_distance=('distance', lambda x: round(x.mean() / 1000, 2)),
+        min_distance=('distance', lambda x: round(x.min() / 1000, 2)),
+        max_distance=('distance', lambda x: round(x.max() / 1000, 2)),
         cambio_fuera_count=('exchange_location', lambda x: (x == 'Cambio fuera').sum()),
-        cambio_fuera_avg_distance=('distance', lambda x: x[df['exchange_location'] == 'Cambio fuera'].mean()),
-        cambio_fuera_min_distance=('distance', lambda x: x[df['exchange_location'] == 'Cambio fuera'].min()),
-        cambio_fuera_max_distance=('distance', lambda x: x[df['exchange_location'] == 'Cambio fuera'].max())
+        cambio_fuera_matched_count=('is_matched', lambda x: x[df['exchange_location'] == 'Cambio fuera'].sum()),
+        cambio_fuera_avg_distance=('distance', lambda x: round(x[df['exchange_location'] == 'Cambio fuera'].mean() / 1000, 2)),
+        cambio_fuera_min_distance=('distance', lambda x: round(x[df['exchange_location'] == 'Cambio fuera'].min() / 1000, 2)),
+        cambio_fuera_max_distance=('distance', lambda x: round(x[df['exchange_location'] == 'Cambio fuera'].max() / 1000, 2))
     ).reset_index()
 
-    manager_stats['matched_percentage'] = manager_stats['matched_drivers'] / manager_stats['total_drivers'] * 100
+    manager_stats['matched_percentage'] = round(manager_stats['matched_drivers'] / manager_stats['total_drivers'] * 100, 2)
+    manager_stats['cambio_fuera_percentage'] = round(manager_stats['cambio_fuera_count'] / manager_stats['total_drivers'] * 100, 2)
+    manager_stats['cambio_fuera_matched_percentage'] = round(manager_stats['cambio_fuera_matched_count'] / manager_stats['cambio_fuera_count'] * 100, 2)
 
-    manager_stats['cambio_fuera_percentage'] = manager_stats['cambio_fuera_count'] / manager_stats['total_drivers'] * 100
+    # Rename columns starting with "cambio_fuera" to "hot_"
+    manager_stats = manager_stats.rename(columns=lambda x: x.replace('cambio_fuera', 'hot') if x.startswith('cambio_fuera') else x)
+
+    # Reorder columns
+    manager_stats = manager_stats[[
+        'manager', 'total_drivers', 'matched_drivers', 'unmatched_drivers', 'matched_percentage',
+        'avg_distance', 'min_distance', 'max_distance',
+        'hot_count', 'hot_percentage', 'hot_matched_count', 'hot_matched_percentage',
+        'hot_avg_distance', 'hot_min_distance', 'hot_max_distance'
+    ]]
 
     return manager_stats
 

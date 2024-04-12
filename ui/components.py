@@ -249,7 +249,7 @@ def create_modal(modal_id, title_id, content_id, footer_id):
         scrollable=True,
     )
 
-def create_data_table(id, data, filename, page_size=10):
+def create_data_table(id, data, filename, page_size=10, custom_height=None):
     # remove _ from column names
     data.columns = data.columns.str.replace('_', ' ')
     columnDefs = [{"field": i} for i in data.columns]
@@ -270,6 +270,8 @@ def create_data_table(id, data, filename, page_size=10):
         },
         className="ag-theme-quartz",
     )
+    if custom_height is not None:
+        grid.style = {'height': custom_height}
     return grid
 
 def create_grouped_graph(data, values_type):
