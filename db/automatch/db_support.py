@@ -50,39 +50,13 @@ def fetch_provinces():
     provinces_df = provinces_df.sort_values(by='name')
     return provinces_df
 
-def fetch_drivers(province_id):
+def fetch_drivers(province_ids):
     engine = connect(database)
-    query = text("""SELECT
-    match1.driver_id,
-    match1.driver,
-    match1.street,
-    match1.lat,
-    match1.lng,
-    match1.vehicle_id,
-    match1.manager,
-    match1.shift,
-    match1.center,
-    match1.province,
-    IF(COUNT(DISTINCT match2.driver_id) > 0, 1, 0) AS is_matched,
-    GROUP_CONCAT(DISTINCT match2.name ORDER BY match2.name SEPARATOR ', ') AS matched_with,
-    match2.driver_id AS matched_driver_id,
-    match1.exchange_location
-    FROM (
-        SELECT
-            D.kendra_id AS driver_id,
-            D.name AS driver,
-            D.street,
-            D.lat,
-            D.lng,
-            DV.vehicle_id,
-            DV.exchange_location_id,
-            EL.name AS exchange_location,
-            P.name AS province,
-            M.name AS manager,
-            S.name AS shift,
-            C.name AS center
-        FROM
-            Drivers D
+    query = text("""
+        SELECT match1.driver_id, match1.driver, match1.street, match1.lat, match1.lng, match1.vehicle_id, match1.manager, match1.shift, match1.center, match1.province, IF(COUNT(DISTINCT match2.driver_id) > 0, 1, 0) AS is_matched, GROUP_CONCAT(DISTINCT match2.name ORDER BY match2.name SEPARATOR ', ') AS matched_with, match2.driver_id AS matched_driver_id, match1.exchange_location 
+        FROM (
+            SELECT D.kendra_id AS driver_id, D.name AS driver, D.street, D.lat, D.lng, DV.vehicle_id, DV.exchange_location_id, EL.name AS exchange_location, P.name AS province, M.name AS manager, S.name AS shift, C.name AS center
+            FROM Drivers D
             JOIN DriversVehiclesExchangeLocations DV ON D.kendra_id = DV.driver_id
             JOIN Vehicles V ON DV.vehicle_id = V.kendra_id
             LEFT JOIN ExchangeLocations EL ON DV.exchange_location_id = EL.id
@@ -90,37 +64,25 @@ def fetch_drivers(province_id):
             JOIN Managers M ON D.manager_id = M.id
             JOIN Shifts S ON D.shift_id = S.id
             JOIN Centers C ON V.center_id = C.id
-        WHERE
-            D.province_id = :province_id
-    ) AS match1
-    LEFT JOIN (
-        SELECT
-            D.kendra_id AS driver_id, D.name, DV.vehicle_id
-        FROM
-            Drivers D
+            WHERE D.province_id IN :province_ids
+        ) AS match1
+        LEFT JOIN (
+            SELECT D.kendra_id AS driver_id, D.name, DV.vehicle_id
+            FROM Drivers D
             JOIN DriversVehiclesExchangeLocations DV ON D.kendra_id = DV.driver_id
-    ) AS match2 ON match1.vehicle_id = match2.vehicle_id AND match1.driver_id != match2.driver_id
-    GROUP BY
-        match1.driver_id,
-        match1.driver,
-        match1.street,
-        match1.lat,
-        match1.lng,
-        match1.vehicle_id,
-        match1.manager,
-        match1.shift,
-        match1.center,
-        match1.province,
-        match2.driver_id,
-        match1.exchange_location
-    ORDER BY
-        match1.driver_id;""")
-
-    # Execute the query with province_id as a parameter
-    drivers_df = pd.read_sql(query, engine, params={"province_id": province_id})
+        ) AS match2 ON match1.vehicle_id = match2.vehicle_id AND match1.driver_id != match2.driver_id
+        GROUP BY match1.driver_id, match1.driver, match1.street, match1.lat, match1.lng, match1.vehicle_id, match1.manager, match1.shift, match1.center, match1.province, match2.driver_id, match1.exchange_location
+        ORDER BY match1.driver_id;
+    """)
+    
+    # Execute the query with province_ids as a parameter
+    drivers_df = pd.read_sql(query, engine, params={"province_ids": province_ids})
+    
     # Explicitly replace NaN values with None
     drivers_df = drivers_df.replace({np.nan: None})
+    
     drivers_gdf = gpd.GeoDataFrame(drivers_df, geometry=gpd.points_from_xy(drivers_df.lng, drivers_df.lat), crs='EPSG:4326')
+    
     drivers_list_dict = [
         {
             "coordinates": [driver.geometry.x, driver.geometry.y],
@@ -136,6 +98,8 @@ def fetch_drivers(province_id):
             "matched_driver_id": driver["matched_driver_id"],
             "matched_with": driver["matched_with"],
             "exchange_location": driver["exchange_location"],
-        } for index, driver in drivers_gdf.iterrows()
+        }
+        for index, driver in drivers_gdf.iterrows()
     ]
+    
     return drivers_gdf, drivers_list_dict
