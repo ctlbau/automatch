@@ -16,7 +16,7 @@ layout = html.Div([
     dcc.Tabs(id="tabs", value='manager-tab', children=[
         dcc.Tab(label='Manager View', value='manager-tab'),
         dcc.Tab(label='Vehicle view', value='vehicle-tab'),
-    ], className="col-md-2 offset-md-1 col-12"),
+    ], className="col-md-3 offset-md-1 col-12"),
     html.Div(id='tabs-content'),
 ])
 ######## End Layout ############
@@ -36,7 +36,7 @@ def render_ui(tab):
         return [
             manager_filter,
             create_company_filter('company-dropdown'),
-            create_filter('center-dropdown', centers, 'Select center', multi=True),
+            create_dropdown('center-dropdown', centers, 'Select center', multi=True),
             create_status_filter('status-dropdown'),
             create_date_range_picker('date-picker-range'),
             create_navbar_options('count-proportion-radio'),

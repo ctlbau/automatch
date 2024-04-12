@@ -4,11 +4,120 @@ import requests as req
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import shape
+from shapely.geometry import LineString
+import polyline
 
-GRAPHHOPPER_URL = "http://localhost:8989/isochrone"
-FIVE_MINUTES = 300
 MAPBOX_API_KEY = os.environ["MAPBOX_TOKEN"]
-BASE_URL = "http://localhost:8989/isochrone"
+FIVE_MINUTES = 300
+BASE_URL = "http://localhost:8989"
+
+def calculate_driver_distances_and_paths(gdf):
+    pathurl = f"{BASE_URL}/route"
+    # print(f"Calculating distances and paths for {len(gdf)} drivers...")
+    
+    # Create new columns to store the calculated distances and paths
+    gdf["distance"] = None
+    gdf["path"] = None
+    
+    # Create a list to store the error information
+    errors = []
+    
+    # Iterate over each row in the GeoDataFrame
+    for index, row in gdf.iterrows():
+        # Check if the driver is matched
+        if row["is_matched"]:
+            # Extract the driver's coordinates from the geometry column
+            driver_coords = row["geometry"]
+            driver_lng, driver_lat = driver_coords.x, driver_coords.y        
+            matched_driver_id = row["matched_driver_id"]
+            
+            # Find the matched driver's coordinates
+            matched_driver = gdf[gdf["driver_id"] == matched_driver_id]
+            if not matched_driver.empty:
+                matched_driver_coords = matched_driver["geometry"].values[0]
+                matched_driver_lng, matched_driver_lat = matched_driver_coords.x, matched_driver_coords.y
+                
+                # Set the query parameters for the API request
+                params = {
+                    "point": [f"{driver_lat},{driver_lng}", f"{matched_driver_lat},{matched_driver_lng}"],
+                    "profile": "car"
+                }
+                
+                # Send the GET request to the API
+                response = req.get(pathurl, params=params)
+                
+                # Check if the request was successful
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Extract the distance from the response
+                    distance = data["paths"][0]["distance"]
+                    
+                    # Extract the encoded path points from the response
+                    encoded_points = data["paths"][0]["points"]
+                    
+                    # Decode the encoded path points
+                    decoded_points = polyline.decode(encoded_points)
+                    
+                    # Check if the decoded points array has at least two points
+                    if len(decoded_points) >= 2:
+                        # Create a LineString geometry from the decoded path points
+                        path_geometry = LineString(decoded_points)
+                    else:
+                        # Set the path geometry to None if the decoded points array is invalid
+                        path_geometry = None
+                    
+                    # Store the calculated distance and path in the GeoDataFrame
+                    gdf.at[index, "distance"] = distance
+                    gdf.at[index, "path"] = path_geometry
+                else:
+                    # Store the error information
+                    error_info = {
+                        "driver_id": row["driver_id"],
+                        "matched_driver_id": matched_driver_id,
+                        "error_code": response.status_code,
+                        "error_message": f"Failed to calculate route. Error: {response.status_code} - Please check the driver and matched driver locations.",
+                        "suggested_action": "Verify the locations for both drivers and try again."
+                    }
+                    errors.append(error_info)
+            else:
+                # Store the error information for unmatched driver
+                error_info = {
+                    "driver_id": row["driver_id"],
+                    "matched_driver_id": matched_driver_id,
+                    "error_message": "Matched driver not found - Please verify the matched driver ID.",
+                    "error_code": "Matched driver not found",
+                    "suggested_action": "Check the matched driver ID for accuracy and try again."
+                }
+                errors.append(error_info)
+    
+    # Create a DataFrame from the error information with clear columns
+    error_df = pd.DataFrame(errors, columns=["driver_id", "matched_driver_id", "error_code", "error_message", "suggested_action"])
+    
+    return gdf, error_df
+
+def get_manager_stats(df):
+    # Group by manager and calculate statistics
+    manager_stats = df.groupby('manager').agg(
+        total_drivers=('driver_id', 'count'),
+        matched_drivers=('is_matched', 'sum'),
+        unmatched_drivers=('is_matched', lambda x: (x == 0).sum()),
+        avg_distance=('distance', 'mean'),
+        min_distance=('distance', 'min'),
+        max_distance=('distance', 'max'),
+        cambio_fuera_count=('exchange_location', lambda x: (x == 'Cambio fuera').sum()),
+        cambio_fuera_avg_distance=('distance', lambda x: x[df['exchange_location'] == 'Cambio fuera'].mean()),
+        cambio_fuera_min_distance=('distance', lambda x: x[df['exchange_location'] == 'Cambio fuera'].min()),
+        cambio_fuera_max_distance=('distance', lambda x: x[df['exchange_location'] == 'Cambio fuera'].max())
+    ).reset_index()
+
+    manager_stats['matched_percentage'] = manager_stats['matched_drivers'] / manager_stats['total_drivers'] * 100
+
+    manager_stats['cambio_fuera_percentage'] = manager_stats['cambio_fuera_count'] / manager_stats['total_drivers'] * 100
+
+    return manager_stats
+
+
 
 
 def geoencode_address(address: str, province: str, postal_code: str):
@@ -28,6 +137,7 @@ def geoencode_address(address: str, province: str, postal_code: str):
 
 def calculate_isochrones(lat: float, lon: float, times: list) -> dict:
     """Fetch isochrones for specified times."""
+    isourl = f"{BASE_URL}/isochrone"
     max_time = max(times)  # The furthest time limit
     buckets = len(times)  # The number of isochrones to generate
     params = {
@@ -36,7 +146,7 @@ def calculate_isochrones(lat: float, lon: float, times: list) -> dict:
         "profile": "car",
         "buckets": buckets
     }
-    response = req.get(GRAPHHOPPER_URL, params=params)
+    response = req.get(isourl, params=params)
     if response.status_code == 200:
         isochrones_features = response.json().get("polygons")
         if isochrones_features is not None:
