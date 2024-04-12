@@ -12,8 +12,8 @@ FIVE_MINUTES = 300
 BASE_URL = "http://localhost:8989"
 
 def calculate_driver_distances_and_paths(gdf):
-    # Set the API endpoint URL for your local GraphHopper instance
     pathurl = f"{BASE_URL}/route"
+    print(f"Calculating distances and paths for {len(gdf)} drivers...")
     
     # Create new columns to store the calculated distances and paths
     gdf["distance"] = None
@@ -28,7 +28,7 @@ def calculate_driver_distances_and_paths(gdf):
         if row["is_matched"]:
             # Extract the driver's coordinates from the geometry column
             driver_coords = row["geometry"]
-            driver_lng, driver_lat = driver_coords.x, driver_coords.y
+            driver_lng, driver_lat = driver_coords.x, driver_coords.y        
             matched_driver_id = row["matched_driver_id"]
             
             # Find the matched driver's coordinates
@@ -75,7 +75,9 @@ def calculate_driver_distances_and_paths(gdf):
                     error_info = {
                         "driver_id": row["driver_id"],
                         "matched_driver_id": matched_driver_id,
-                        "error_message": f"Status Code: {response.status_code}, Response: {response.text}"
+                        "error_code": response.status_code,
+                        "error_message": f"Failed to calculate route. Error: {response.status_code} - Please check the driver and matched driver locations.",
+                        "suggested_action": "Verify the locations for both drivers and try again."
                     }
                     errors.append(error_info)
             else:
@@ -83,14 +85,38 @@ def calculate_driver_distances_and_paths(gdf):
                 error_info = {
                     "driver_id": row["driver_id"],
                     "matched_driver_id": matched_driver_id,
-                    "error_message": "Matched driver not found"
+                    "error_message": "Matched driver not found - Please verify the matched driver ID.",
+                    "error_code": "Matched driver not found",
+                    "suggested_action": "Check the matched driver ID for accuracy and try again."
                 }
                 errors.append(error_info)
     
-    # Create a DataFrame from the error information
-    error_df = pd.DataFrame(errors)
+    # Create a DataFrame from the error information with clear columns
+    error_df = pd.DataFrame(errors, columns=["driver_id", "matched_driver_id", "error_code", "error_message", "suggested_action"])
     
     return gdf, error_df
+
+def get_manager_stats(df):
+    # Group by manager and calculate statistics
+    manager_stats = df.groupby('manager').agg(
+        total_drivers=('driver_id', 'count'),
+        matched_drivers=('is_matched', 'sum'),
+        unmatched_drivers=('is_matched', lambda x: (x == 0).sum()),
+        avg_distance=('distance', 'mean'),
+        min_distance=('distance', 'min'),
+        max_distance=('distance', 'max'),
+        cambio_fuera_count=('exchange_location', lambda x: (x == 'Cambio fuera').sum()),
+        cambio_fuera_avg_distance=('distance', lambda x: x[df['exchange_location'] == 'Cambio fuera'].mean()),
+        cambio_fuera_min_distance=('distance', lambda x: x[df['exchange_location'] == 'Cambio fuera'].min()),
+        cambio_fuera_max_distance=('distance', lambda x: x[df['exchange_location'] == 'Cambio fuera'].max())
+    ).reset_index()
+
+    manager_stats['matched_percentage'] = manager_stats['matched_drivers'] / manager_stats['total_drivers'] * 100
+
+    manager_stats['cambio_fuera_percentage'] = manager_stats['cambio_fuera_count'] / manager_stats['total_drivers'] * 100
+
+    return manager_stats
+
 
 
 

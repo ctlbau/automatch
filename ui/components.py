@@ -5,6 +5,50 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 import dash_ag_grid as dag
+import pydeck as pdk
+from dash_deck import DeckGL
+import os
+
+ATOCHA = (-3.690633, 40.406785)
+MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
+CHOSEN_STYLE = MAP_STYLES[0]
+MAPBOX_API_KEY = os.getenv("MAPBOX_TOKEN")
+
+
+def create_map_container(id):
+        return html.Div([
+            dcc.Loading(
+                id="loading-map", 
+                children=[
+                    html.Div(
+                        DeckGL(
+                            id=id,
+                            data=pdk.Deck(
+                                initial_view_state=pdk.ViewState(
+                                    longitude=ATOCHA[0],
+                                    latitude=ATOCHA[1],
+                                    zoom=5,
+                                    pitch=0,
+                                    ),
+                                layers=[],
+                                map_style=CHOSEN_STYLE,                            
+                            ).to_json(),
+                            mapboxKey=MAPBOX_API_KEY,
+                            tooltip={
+                                "html": "<b>Name:</b> {name}<br><b>Street:</b> {street}<br><b>Manager:</b> {manager}<br><b>Shift:</b> {shift} <br> <b>Center:</b> {center}, <b>Matched:</b> {is_matched} <br> <b>Matched With:</b> {matched_with} <br> <b>Exchange Location:</b> {exchange_location}",
+                                "style": {
+                                    "backgroundColor": "steelblue",
+                                    "color": "white"
+                                }
+                            }
+                        ),
+                        style={'height': '50vh', 'width': '100%'}  # Set the size of the map here
+                    )
+                ], 
+                type="circle"
+            ),
+        ], style={'width': '80%', 'position': 'relative', 'marginTop': '20px'})
+
 
 def create_navbar(title):
     return html.Nav(
@@ -60,8 +104,7 @@ def create_dropdown(id, options, placeholder, multi=False):
                             multi=multi,
                             clearable=True,
                             placeholder=placeholder,
-                            style={'marginBottom': '10px'}
-                        ), className="col-md-3 offset-md-0 col-12",
+                        ), className="col-md-4 offset-md-4 col-12",
                     )
                 ]
             )
@@ -69,7 +112,7 @@ def create_dropdown(id, options, placeholder, multi=False):
     )
 
 def label_value_from_dict(data):
-    return [{'label': data['name'], 'value': data['id']} for data in data]
+    return [{'label': data['name'], 'value': data['name']} for data in data]
 
 def create_status_filter(id):
     return html.Nav(
@@ -186,23 +229,6 @@ def create_navbar_options(count_or_proportion_id):
         ]
     )
 
-def create_modal_window(data):
-    data_table = create_data_table('modal-data-table', data)
-    return html.Div([
-        dbc.Button("Show Modal", id="open-modal"),
-        dbc.Modal(
-            [
-                dbc.ModalHeader("Details"),
-                dbc.ModalBody(data_table),
-                dbc.ModalFooter(
-                    dbc.Button("Close", id="close-modal", className="ml-auto")
-            ),
-        ],
-        id="details-modal",
-        is_open=False,
-        size="xl",
-    )
-])
 
 def create_modal(modal_id, title_id, content_id, footer_id):
     return dbc.Modal(
@@ -274,3 +300,58 @@ def create_line_graph(data, values_type):
     fig.update_layout(height=400, xaxis_tickangle=-45, yaxis=dict(type='log'))
     fig.update_xaxes(tickformat="%Y-%m-%d")
     return dcc.Graph(figure=fig)
+
+
+def create_arc_layer(drivers_gdf):
+    arc_data = []
+    for _, row in drivers_gdf[drivers_gdf['is_matched'] == True].iterrows():
+        driver_coords = row['geometry']
+        matched_driver_id = row['matched_driver_id']
+        if pd.notna(matched_driver_id):
+            matched_driver = drivers_gdf[drivers_gdf['driver_id'] == matched_driver_id]
+            if not matched_driver.empty:
+                matched_driver_coords = matched_driver['geometry'].values[0]
+                arc_data.append({
+                    'from': [driver_coords.x, driver_coords.y],
+                    'to': [matched_driver_coords.x, matched_driver_coords.y],
+                    'driver_id': row['driver_id'],
+                    'matched_driver_id': matched_driver_id
+                })
+
+    arc_layer = pdk.Layer(
+        "ArcLayer",
+        data=arc_data,
+        get_source_position="from",
+        get_target_position="to",
+        get_width=2,
+        get_tilt=15,
+        get_source_color=[64, 255, 0],
+        get_target_color=[0, 128, 200],
+        pickable=True,
+        auto_highlight=True
+    )
+
+    return pdk.Deck(layers=[arc_layer]).to_json()
+
+
+def create_path_layer(drivers_gdf):
+    path_data = []
+    for _, row in drivers_gdf[drivers_gdf['is_matched'] == True].iterrows():
+        if pd.notna(row['path']):
+            path_data.append({
+                'path': [[lon, lat] for lon, lat in row['path'].coords],
+                'driver_id': row['driver_id'],
+                'matched_driver_id': row['matched_driver_id']
+            })
+    
+    path_df = pd.DataFrame(path_data)
+    path_layer = pdk.Layer(
+        "PathLayer",
+        data=path_df,
+        get_path="path",
+        get_width=5,
+        get_color=[64, 255, 0],
+        pickable=True,
+    )
+
+    return pdk.Deck(layers=[path_layer]).to_json()  
