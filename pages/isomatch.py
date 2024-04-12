@@ -111,8 +111,11 @@ peak_layout = html.Div([
         type="circle",
         children=[
             html.Div([
-                html.Div(id='peak-grid-container', children=[], style={'width': '77%', 'position': 'relative', 'marginTop': '20px'}),
-                html.Button("Show Errors", id="show-error-modal-btn", className="ml-auto", style={'marginTop': '20px', 'display': 'none', 'alignSelf': 'flex-start'}),
+                html.Div(id='peak-grid-container', children=[], style={'width': '78%', 'position': 'relative', 'marginTop': '20px'}),
+                html.Div([
+                    html.Button("Show Errors", id="show-error-modal-btn", className="ml-auto", style={ 'display': 'inline-block', 'alignSelf': 'flex-start'}),
+                    html.Button("Download CSV", id="download-manager-stats-csv-btn", className="ml-auto", style={'display': 'inline-block', 'alignSelf': 'flex-end'}),
+                ], style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center', 'marginTop': '10px'}),
             ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center', 'justifyContent': 'flex-end', 'height': '100%'}),
         ]
     ),
@@ -149,10 +152,21 @@ def update_peak_grid(tab):
         drivers_gdf, _ = fetch_drivers([28])
         drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
         manager_stats = get_manager_stats(drivers_gdf_w_paths_and_distances)
-        grid = create_data_table('Manager Stats', manager_stats, 'manager_stats.csv', page_size=20)
+        grid = create_data_table('manager-stats', manager_stats, 'manager_stats.csv', page_size=20)
         return [grid], error_df.to_dict('records') if error_df is not None else None
     else:
         return [], None
+
+@callback(
+        Output('manager-stats', 'exportDataAsCsv'),
+        Input('download-manager-stats-csv-btn', 'n_clicks'),
+        prevent_initial_call=True
+)
+def download_manager_stats_csv(n_clicks):
+    if n_clicks > 0:
+        return True
+    return dash.no_update
+
 
 @callback(
     Output("show-error-modal-btn", "style"),
