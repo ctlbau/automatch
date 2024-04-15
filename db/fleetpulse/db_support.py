@@ -23,9 +23,49 @@ def fetch_managers():
     return managers_df
 
 def fetch_centers():
+    centers = ['Clematis Bach Transportation Services S.L.', 
+               'Autos Lavapiés S.L. (Madrid)', 'Proinvertia Madrid S.L. (Madrid)',
+                'Vtc Transfer Sociality S.L.',
+                'Afm Portal de Transporte S.L. (Madrid)',
+                'Gest VTC Service S.L.',
+                'Zater Transportation Services 1525 S.L.',
+                'GTX Madrid',
+                'Next Band S.L. (Madrid)',
+                'Auro Madrid',
+                'Do The Right Thing Cars S.L. (Madrid)',
+                'Iceberg Smart Cab S.L.',
+                'Autos Agrimony Bach Transportation S.L.',
+                'Autos Miraz la Bella S.L.',
+                'Freetown Business S.L.',
+                'Autos Ararat Transportation S.L (Madrid)',
+                'Autos Puerta del Sol S.L. (Madrid)',
+                'Vtc Kico Cars S.L.',
+                'Vtc Felp Transfer S.L.',
+                'Inertia Mobility S.L. (Madrid)',
+                'Intercambiadores Europeos SL',
+                'Mindworld Project S.L',
+                'Swift Transports Crt S.L',
+                'AUTOS NOROESTE ALQUILER DE COCHES SIN CONDUCTOR SL',
+                'Shuttle Vip Madrid',
+                'Autos La Maruca Da Serpe S.L. (Madrid)',
+                'Libreocupado S.L. (Madrid)',
+                'Libreocupado S.L (Málaga)',
+                'Alquiler de vehículos con conductor Jaén y Málaga S.L. (MLAGA)',
+                'Cibeles Comfort Cars S.L. (Madrid)',
+                'Automóviles Zirconio S.L. (Valencia)',
+                'Automóviles Titanio S.L. (Valencia)',
+                'Libreocupado S.L. (Valencia)',
+                'Freetown Business S.L. (Barcelona)',
+                'Automóviles Titanio S.L. (Barcelona)',
+                'Radio Taxi Barcelona S.L. (Barcelona)',
+                'Automóviles Zirconio S.L. (Málaga)',
+                'Automóviles Zirconio S.L. (Sevilla)',
+                'AYG PRODSERVICES SL',
+                'Libreocupado S.L (Barcelona)',]
     engine = connect(database)
     query = text("SELECT id, name FROM Centers;")
     centers_df = pd.read_sql(query, engine)
+    centers_df = centers_df[centers_df['name'].isin(centers)]
     centers_df = centers_df.sort_values(by='name')
     return centers_df
 
