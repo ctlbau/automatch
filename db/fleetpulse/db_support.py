@@ -24,7 +24,8 @@ def fetch_managers():
 
 def fetch_centers():
     centers = ['Clematis Bach Transportation Services S.L.', 
-               'Autos Lavapiés S.L. (Madrid)', 'Proinvertia Madrid S.L. (Madrid)',
+               'Autos Lavapiés S.L. (Madrid)', 
+               'Proinvertia Madrid S.L. (Madrid)',
                 'Vtc Transfer Sociality S.L.',
                 'Afm Portal de Transporte S.L. (Madrid)',
                 'Gest VTC Service S.L.',
