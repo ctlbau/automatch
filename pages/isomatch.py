@@ -10,7 +10,7 @@ from db.automatch import fetch_drivers, fetch_shifts, fetch_managers, fetch_cent
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
-from ui.components import create_data_table, create_dropdown, create_map_container, create_modal, exchange_locations_dropdown
+from ui.components import create_data_table, create_dropdown, create_map_container, create_modal
 from datetime import datetime
 import pandas as pd
 
@@ -22,7 +22,6 @@ MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9
 CHOSEN_STYLE = MAP_STYLES[0]
 
 iso_layout = html.Div([
-    # Container for inputs and button
     html.Div([
         dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, style={'marginRight': '10px', 'width': '350px', 'display': 'block', 'marginBottom': '10px'}),
         dcc.Dropdown(
@@ -53,21 +52,21 @@ iso_layout = html.Div([
             multi=True,
             style={'marginBottom': '10px'}
         ),
-        dcc.Dropdown(  # Dropdown for managers
+        dcc.Dropdown(
             id='managers-dropdown',
             options=[{'label': manager['name'], 'value': manager['name']} for manager in fetch_managers().to_dict('records')],
             placeholder='Select a manager',
             multi=True,
             style={'marginBottom': '10px'}
         ),
-        dcc.Dropdown(  # Dropdown for center selection
+        dcc.Dropdown(
             id='center-dropdown',
             options=[{'label': center['name'], 'value': center['name']} for center in fetch_centers().to_dict('records')],
             placeholder='Select a center',
             multi=True,
             style={'marginBottom': '10px'}
         ),
-        dcc.Dropdown(  # Dropdown for exchange location selection
+        dcc.Dropdown(
             id='exchange-locations-dropdown',
             options=[{'label': exchange_location['name'], 'value': exchange_location['name']} for exchange_location in fetch_exchange_locations().to_dict('records')],
             placeholder='Select an exchange location',
@@ -76,7 +75,7 @@ iso_layout = html.Div([
         ),
         html.Div([  # Div for radio items to display horizontally
             html.Label('Filter by Match Status:', style={'marginRight': '20px', 'marginBottom': '10px'}),
-            dcc.RadioItems(  # Radio button for is_matched filter
+            dcc.RadioItems(
                 id='is-matched-radio',
                 options=[
                     {'label': 'All', 'value': 'all'},
@@ -90,30 +89,36 @@ iso_layout = html.Div([
         ], style={'display': 'flex', 'flexDirection': 'row', 'alignItems': 'center'}),
     ], className="col-md-3 offset-md-0 col-12"),
     
-    # Alert for failed geoencoding
     dbc.Alert(
         id="alert-fail-geoencode",
         children="Unable to find location. Please check the address and zip code, then try again.",
         color="danger",
-        dismissable=True,  # Allows the user to close the alert
-        is_open=False,  # Initially hidden
-        style={'marginTop': '20px'},  # Adjust the margin as needed
+        dismissable=True,
+        is_open=False,
+        style={'marginTop': '20px'},
         ),
-    # Container for the map
     create_map_container('isomatch-map'),
     html.Div(id='data-tables-container', children=[], style={'width': '75%', 'position': 'relative', 'marginTop': '20px'}),  # Container for dynamic data tables
 ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
 
-peak_layout = html.Div([
+stats_layout = html.Div([
     dcc.Store(id='error-data-store'),
     create_modal("error-modal", "error-modal-title", "error-details-grid", "error-modal-footer"),
-    exchange_locations_dropdown('exchange-locations-dropdown', 'Select an exchange location', multi=False),
+    create_dropdown(
+        id='exchange-locations-dropdown',
+        options=fetch_exchange_locations().to_dict('records'),
+        label='name',
+        value='id',
+        placeholder='Select an exchange location',
+        multi=False,
+        add_all=True
+        ),
     dcc.Loading(
         id="loading-peak-container",
         type="circle",
         children=[
             html.Div([
-                html.Div(id='peak-grid-container', children=[], style={'width': '79%', 'marginTop': '20px'}),
+                html.Div(id='stats-grid-container', children=[], style={'width': '79%', 'marginTop': '20px'}),
                 html.Div([
                     html.Button("Show Errors", id="show-error-modal-btn", className="ml-auto", style={'display': 'inline-block', 'alignSelf': 'flex-start'}),
                     html.Button("Download CSV", id="download-manager-stats-csv-btn", className="ml-auto", style={'display': 'inline-block', 'alignSelf': 'flex-end'}),
@@ -126,7 +131,7 @@ peak_layout = html.Div([
 layout = html.Div([
     dcc.Tabs(id="tabs", value='iso-tab', children=[
         dcc.Tab(label='Isomatch', value='iso-tab'),
-        dcc.Tab(label='PeakPilot', value='peak-tab'),
+        dcc.Tab(label='Matchstats', value='stats-tab'),
     ], className="col-md-3 offset-md-1 col-12"),
     html.Div(id='isomatch-tabs-content'),
 ])
@@ -138,35 +143,26 @@ layout = html.Div([
 def render_content(tab):
     if tab == 'iso-tab':
         return iso_layout
-    elif tab == 'peak-tab':
-        return peak_layout
+    elif tab == 'stats-tab':
+        return stats_layout
     else:
         return None
 
-@callback(Output('exchange-locations-dropdown', 'options'),
-          Input('tabs', 'value'))
-def update_exchange_locations_dropdown(tab):
-    if tab == 'peak-tab':
-        options = [{'label': exchange_location['name'], 'value': exchange_location['id']} for exchange_location in fetch_exchange_locations().to_dict('records')]
-        options.insert(0, {'label': 'All', 'value': 0})
-        print(options)
-        return options
-    return []
-
-
 @callback(
-    Output('peak-grid-container', 'children'),
+    Output('stats-grid-container', 'children'),
     Output('error-data-store', 'data'),
     Input('exchange-locations-dropdown', 'value'),
     State('exchange-locations-dropdown', 'options'),
 )
-def update_peak_grid(exchange_locations_id, exchange_locations_options):
-    if exchange_locations_id is not None:  
+def update_stats_grid(exchange_locations_id, exchange_locations_options):
+    if exchange_locations_id is not None:
+        today = datetime.now().strftime("%Y-%m-%d")  
         if exchange_locations_id == 0:  
+            # All exchange locations selected
             drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])  
             drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
             manager_stats = get_manager_stats(drivers_gdf_w_paths_and_distances, "All")
-            grid = create_data_table('manager-stats', manager_stats, 'manager_stats.csv', page_size=20, custom_height='800px')
+            grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}.csv', page_size=20, custom_height='800px')
             return [grid], error_df.to_dict('records') if error_df is not None else None
         else:
             # Specific exchange location selected
@@ -176,7 +172,7 @@ def update_peak_grid(exchange_locations_id, exchange_locations_options):
                 drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])
                 drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
                 manager_stats = get_manager_stats(drivers_gdf_w_paths_and_distances, exchange_location)
-                grid = create_data_table('manager-stats', manager_stats, 'manager_stats.csv', page_size=20, custom_height='800px')
+                grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}_at_{exchange_location}.csv', page_size=20, custom_height='800px')
                 return [grid], error_df.to_dict('records') if error_df is not None else None
             else:
                 print("Selected exchange location not found in options.")

@@ -89,7 +89,10 @@ def create_company_filter(id):
         ]
     )
 
-def create_dropdown(id, options, placeholder, multi=False):
+def create_dropdown(id, options, label='name', value='id', placeholder='Select an option', multi=False, add_all=False):
+    options = [{'label': option[label], 'value': option[value]} for option in options]
+    if add_all:
+        options = [{'label': 'All', 'value': 0}] + options
     return html.Nav(
         className="navbar navbar-expand-lg mb-2",
         children=[
@@ -99,7 +102,7 @@ def create_dropdown(id, options, placeholder, multi=False):
                     html.Div(
                         dcc.Dropdown(
                             id=id,
-                            options=label_value_from_dict(options),
+                            options=options,
                             value=[],
                             multi=multi,
                             clearable=True,
@@ -110,9 +113,6 @@ def create_dropdown(id, options, placeholder, multi=False):
             )
         ]
     )
-
-def label_value_from_dict(data):
-    return [{'label': data['name'], 'value': data['id']} for data in data]
 
 
 def exchange_locations_dropdown(id, placeholder, multi=False):
