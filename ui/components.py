@@ -114,6 +114,29 @@ def create_dropdown(id, options, placeholder, multi=False):
 def label_value_from_dict(data):
     return [{'label': data['name'], 'value': data['id']} for data in data]
 
+
+def exchange_locations_dropdown(id, placeholder, multi=False):
+    return html.Nav(
+        className="navbar navbar-expand-lg mb-2",
+        children=[
+            html.Div(
+                className="container-fluid",
+                children=[
+                    html.Div(
+                        dcc.Dropdown(
+                            id=id,
+                            options=[],
+                            value=[],
+                            multi=multi,
+                            clearable=True,
+                            placeholder=placeholder,
+                        ), className="col-md-4 offset-md-4 col-12",
+                    )
+                ]
+            )
+        ]
+    )
+
 def create_status_filter(id):
     return html.Nav(
         className="navbar navbar-expand-lg mb-2",
