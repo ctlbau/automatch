@@ -10,19 +10,14 @@ from utils.agg_utils import calculate_aggregations, calculate_status_periods, fi
 
 dash.register_page(__name__, path='/fleet')
 
-######## Begin Layout ##########
 layout = html.Div([
-    # create_navbar('Fleet Pulse'),
     dcc.Tabs(id="tabs", value='manager-tab', children=[
         dcc.Tab(label='Manager View', value='manager-tab'),
         dcc.Tab(label='Vehicle view', value='vehicle-tab'),
     ], className="col-md-3 offset-md-1 col-12"),
     html.Div(id='tabs-content'),
 ])
-######## End Layout ############
 
-
-############ Begin Render UI ############
 @callback(
     Output('tabs-content', 'children'),
     [
@@ -31,13 +26,14 @@ layout = html.Div([
 )
 def render_ui(tab):
     if tab == 'manager-tab':
-        centers = fetch_centers().to_dict('records')
-        # TODO: refactor filters with generic create_filter
+        center_options = fetch_centers().to_dict('records')
+        status_options = fetch_statuses().to_dict('records')
+        manager_options = fetch_managers().to_dict('records')
         return [
-            manager_filter,
+            create_dropdown('manager-dropdown', options=manager_options, label='name', value='name', placeholder='Select manager', multi=False, add_all=True),
             create_company_filter('company-dropdown'),
-            create_dropdown('center-dropdown', centers, 'Select center', multi=True),
-            create_status_filter('status-dropdown'),
+            create_dropdown('center-dropdown', options=center_options, label='name', value='id', placeholder='Select center', multi=True, add_all=False),
+            create_dropdown('status-dropdown', options=status_options, label='status', value='status', placeholder='Select status', multi=True, add_all=False),
             create_date_range_picker('date-picker-range'),
             create_navbar_options('count-proportion-radio'),
             html.Div(id='manager-view-graph-and-table-container', className="col-md-9 offset-md-2 col-12"),
@@ -45,50 +41,12 @@ def render_ui(tab):
             create_modal('details-modal-part', 'details-modal-title-part', 'modal-content-part', 'modal-footer-part'),
         ]
     elif tab == 'vehicle-tab':
+        plates_options = fetch_plates().to_dict('records')
         return [
-            create_plate_filter('plate-dropdown'),
+            create_dropdown('plate-dropdown', options=plates_options, label='plate', value='plate', placeholder='Select plate', multi=False, add_all=False),
             create_date_range_picker('date-picker-range'),
             html.Div(id='vehicle-view-graph-container', className="col-md-9 offset-md-2 col-12")
         ]
-########## End Render UI ###########
-
-########## Begin Dropdown Options ##########
-@callback(
-    [Output('manager-dropdown', 'options'),
-     Output('status-dropdown', 'options')],
-    [Input('tabs', 'value')]
-)
-def set_in_managerview_manager_and_status_dropdown(tab):
-    statuses = fetch_statuses()
-    managers = fetch_managers()
-    status_options = [
-        {'label': status, 'value': status} for status in statuses['status']
-        ]
-    manager_options = [
-            {'label': manager, 'value': manager} for manager in managers['name']
-            ]
-    manager_options.insert(0, {'label': 'All Managers', 'value': 'all'})
-
-    if tab != 'manager-tab':
-        return [], []
-    return manager_options, status_options
-
-@callback(
-    Output('plate-dropdown', 'options'),
-    [Input('tabs', 'value')]
-)
-def update_plate_dropdown(tab):
-    if tab != 'vehicle-tab':
-        return dash.no_update
-
-    plates = fetch_plates()
-
-    plate_options = [{'label': plate, 'value': plate} for plate in plates['plate']]
-
-    return plate_options
-########## End Dropdown Options ##########
-
-
 
 @callback(
     Output('manager-view-graph-and-table-container', 'children'),
@@ -112,8 +70,8 @@ def update_managerview_table_and_graph(tab, start_date, end_date, selected_compa
     agg_df = calculate_aggregations(base_df, ['date', 'status'])
     table_page_size = len(selected_statuses) if selected_statuses else len(status_options)
 
-    if 'all' == selected_manager:
-
+    if selected_manager == 0:
+        # All managers
         if selected_statuses:
             base_df = base_df[base_df['status'].isin(selected_statuses)]
             agg_df = agg_df[agg_df['status'].isin(selected_statuses)]
@@ -242,7 +200,6 @@ def download_csv(n_clicks):
         return True
     return dash.no_update
 
-
 @callback(
     Output('details-modal-part', 'is_open'),
     Output('details-modal-title-part', 'children'),
@@ -334,15 +291,12 @@ def update_vehicle_view(tab, selected_plate, start_date, end_date):
     if tab != 'vehicle-tab':
         return dash.no_update
 
-    df = select_plate(
-        plate=selected_plate,
-        from_date=start_date,
-        to_date=end_date
-    )
-
-    # Create a line graph showing the status of the vehicle over time
-    fig = px.line(df, x='date', y='status', title='Vehicle Status Over Time', markers=True)
-    fig.update_layout(height=400, xaxis_tickangle=-45)
-    fig.update_xaxes(tickformat="%Y-%m-%d")
-
+    if selected_plate:
+        df = select_plate(plate=selected_plate, from_date=start_date, to_date=end_date)
+        fig = px.line(df, x='date', y='status', title='Vehicle Status Over Time', markers=True)
+        fig.update_layout(height=400, xaxis_tickangle=-45)
+        fig.update_xaxes(tickformat="%Y-%m-%d")
+    else:
+        return dash.no_update
+    
     return dbc.Row([dbc.Col(dcc.Graph(figure=fig), width=12)])
