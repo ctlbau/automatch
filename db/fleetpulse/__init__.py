@@ -1,1 +1,1 @@
-from .db_support import fetch_exchange_locations, fetch_centers, fetch_managers, fetch_shifts, fetch_provinces, fetch_drivers, fetch_vehicles
+from .db_support import fetch_managers, fetch_centers, fetch_date_range, fetch_plates, fetch_statuses, fetch_vehicles
