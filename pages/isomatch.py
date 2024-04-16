@@ -4,12 +4,13 @@ import dash_deck as dd
 from dash_deck import DeckGL
 from dash import html, dcc, callback, MATCH
 import pydeck as pdk
-from utils.geo_utils import geoencode_address, calculate_isochrones, partition_drivers_by_isochrones, extract_coords_from_encompassing_isochrone, check_partitions_intersection, calculate_driver_distances_and_paths, get_manager_stats
+from utils.geo_utils import geoencode_address, calculate_isochrones, partition_drivers_by_isochrones, extract_coords_from_encompassing_isochrone, check_partitions_intersection, calculate_driver_distances_and_paths
+from utils.agg_utils import get_manager_stats
 from db.automatch import fetch_drivers, fetch_shifts, fetch_managers, fetch_centers, fetch_provinces, fetch_exchange_locations
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
-from ui.components import create_data_table, create_dropdown, create_map_container, create_modal
+from ui.components import create_data_table, create_dropdown, create_map_container, create_modal, exchange_locations_dropdown
 from datetime import datetime
 import pandas as pd
 
@@ -106,12 +107,12 @@ iso_layout = html.Div([
 peak_layout = html.Div([
     dcc.Store(id='error-data-store'),
     create_modal("error-modal", "error-modal-title", "error-details-grid", "error-modal-footer"),
+    exchange_locations_dropdown('exchange-locations-dropdown', 'Select an exchange location', multi=False),
     dcc.Loading(
         id="loading-peak-container",
         type="circle",
         children=[
             html.Div([
-                # Adjust the width and margin of the peak-grid-container's parent div
                 html.Div(id='peak-grid-container', children=[], style={'width': '79%', 'marginTop': '20px'}),
                 html.Div([
                     html.Button("Show Errors", id="show-error-modal-btn", className="ml-auto", style={'display': 'inline-block', 'alignSelf': 'flex-start'}),
@@ -142,21 +143,45 @@ def render_content(tab):
     else:
         return None
 
+@callback(Output('exchange-locations-dropdown', 'options'),
+          Input('tabs', 'value'))
+def update_exchange_locations_dropdown(tab):
+    if tab == 'peak-tab':
+        options = [{'label': exchange_location['name'], 'value': exchange_location['id']} for exchange_location in fetch_exchange_locations().to_dict('records')]
+        options.insert(0, {'label': 'All', 'value': 0})
+        print(options)
+        return options
+    return []
+
 
 @callback(
     Output('peak-grid-container', 'children'),
     Output('error-data-store', 'data'),
-    Input('tabs', 'value'),
+    Input('exchange-locations-dropdown', 'value'),
+    State('exchange-locations-dropdown', 'options'),
 )
-def update_peak_grid(tab):
-    if tab == 'peak-tab':
-        drivers_gdf, _ = fetch_drivers([28])
-        drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
-        manager_stats = get_manager_stats(drivers_gdf_w_paths_and_distances)
-        grid = create_data_table('manager-stats', manager_stats, 'manager_stats.csv', page_size=20,custom_height='800px')
-        return [grid], error_df.to_dict('records') if error_df is not None else None
-    else:
-        return [], None
+def update_peak_grid(exchange_locations_id, exchange_locations_options):
+    if exchange_locations_id is not None:  
+        if exchange_locations_id == 0:  
+            drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])  
+            drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
+            manager_stats = get_manager_stats(drivers_gdf_w_paths_and_distances, "All")
+            grid = create_data_table('manager-stats', manager_stats, 'manager_stats.csv', page_size=20, custom_height='800px')
+            return [grid], error_df.to_dict('records') if error_df is not None else None
+        else:
+            # Specific exchange location selected
+            selected_option = next((option for option in exchange_locations_options if option['value'] == exchange_locations_id), None)
+            if selected_option:
+                exchange_location = selected_option['label']
+                drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])
+                drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
+                manager_stats = get_manager_stats(drivers_gdf_w_paths_and_distances, exchange_location)
+                grid = create_data_table('manager-stats', manager_stats, 'manager_stats.csv', page_size=20, custom_height='800px')
+                return [grid], error_df.to_dict('records') if error_df is not None else None
+            else:
+                print("Selected exchange location not found in options.")
+                return dash.no_update, dash.no_update
+    return dash.no_update, dash.no_update
 
 @callback(
         Output('manager-stats', 'exportDataAsCsv'),

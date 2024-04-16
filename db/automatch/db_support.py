@@ -14,10 +14,12 @@ else:
     database = localauth_prod
 
 def fetch_exchange_locations():
+    exchange_locations = ['Cambio fuera', 'Parking Reyes Magos', 'Parking Marqués de Urquijo']
     engine = connect(database)
     query = text("SELECT id, name FROM ExchangeLocations;")
     exchange_locations_df = pd.read_sql(query, engine)
     exchange_locations_df = exchange_locations_df.sort_values(by='name')
+    exchange_locations_df = exchange_locations_df[exchange_locations_df["name"].isin(exchange_locations)]
     return exchange_locations_df
 
 def fetch_centers():

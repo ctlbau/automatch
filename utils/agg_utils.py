@@ -18,6 +18,50 @@ def calculate_aggregations(base_df, group_columns):
 
     return proportion_data
 
+def get_manager_stats(df, case='All'):
+    # Group by manager and calculate total_drivers for all cases
+    total_drivers = df.groupby('manager')['driver_id'].count().reset_index(name='total_drivers')
+
+    if case == 'All':
+        # Group by manager and calculate statistics for all cases
+        manager_stats = df.groupby('manager').agg(
+            total_drivers=('driver_id', 'count'),
+            matched_drivers=('is_matched', 'sum'),
+            unmatched_drivers=('is_matched', lambda x: (x == 0).sum()),
+            avg_distance=('distance', lambda x: round(x.mean() / 1000, 2)),
+            median_distance=('distance', lambda x: round(x.median() / 1000, 2)),
+            min_distance=('distance', lambda x: round(x.min() / 1000, 2)),
+            max_distance=('distance', lambda x: round(x.max() / 1000, 2))
+        ).reset_index()
+
+        manager_stats['matched_percentage'] = round(manager_stats['matched_drivers'] / manager_stats['total_drivers'] * 100, 2)
+
+        # Reorder columns
+        columns_order = [
+            'manager', 'total_drivers', 'matched_drivers', 'unmatched_drivers', 'matched_percentage',
+            'avg_distance', 'median_distance', 'min_distance', 'max_distance'
+        ]
+        manager_stats = manager_stats[columns_order]
+    else:
+        # Group by manager and calculate statistics for the specified case
+        manager_stats = df[df['exchange_location'] == case].groupby('manager').agg(
+            count=('exchange_location', 'count'),
+            matched_count=('is_matched', 'sum'),
+            avg_distance=('distance', lambda x: round(x.mean() / 1000, 2)),
+            median_distance=('distance', lambda x: round(x.median() / 1000, 2)),
+            min_distance=('distance', lambda x: round(x.min() / 1000, 2)),
+            max_distance=('distance', lambda x: round(x.max() / 1000, 2))
+        ).reset_index()
+
+        manager_stats['matched_percentage'] = round(manager_stats['matched_count'] / manager_stats['count'] * 100, 2)
+        manager_stats = manager_stats.merge(total_drivers, on='manager', how='left')
+        manager_stats['percentage'] = round(manager_stats['count'] / manager_stats['total_drivers'] * 100, 2)
+
+        manager_stats = manager_stats.drop('total_drivers', axis=1)
+        # manager_stats.columns = [f"{case}_{col}" if col != 'manager' else col for col in manager_stats.columns]
+
+    return manager_stats
+
 def calculate_status_periods(base_df):
     # Ensure 'date' is in datetime format
     base_df['date'] = pd.to_datetime(base_df['date'])
