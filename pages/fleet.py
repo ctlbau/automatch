@@ -65,8 +65,6 @@ def render_ui(tab):
 def update_managerview_table_and_graph(tab, start_date, end_date, selected_company, selected_centers, selected_manager, selected_statuses, count_proportion_radio, status_options):
     if tab != 'manager-tab':
         return dash.no_update
-    
-    print(selected_company)
 
     base_df = fetch_vehicles(selected_centers, company=selected_company, from_date=start_date, to_date=end_date)
     agg_df = calculate_aggregations(base_df, ['date', 'status'])
