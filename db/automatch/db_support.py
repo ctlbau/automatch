@@ -13,6 +13,45 @@ elif app_env == 'dev':
 else:
     database = localauth_prod
 
+def fetch_vehicle_shifts():
+    engine = connect(database)
+    columns = ["plate","Mañana", "Tarde", "TP-V-D", "TP-L-V", "L-J", "L-J_(40h)", "Turno_Completo"]
+
+    query = text("""
+        SELECT
+            v.plate,
+            MAX(CASE WHEN s.name = 'Mañana' THEN 1 ELSE 0 END) AS 'Mañana',
+            MAX(CASE WHEN s.name = 'Tarde' THEN 1 ELSE 0 END) AS 'Tarde',
+            MAX(CASE WHEN s.name = 'Turno Completo' THEN 1 ELSE 0 END) AS 'Turno_Completo',
+            MAX(CASE WHEN s.name = 'J&T Turno diario' THEN 1 ELSE 0 END) AS 'J&T_Turno_diario',
+            MAX(CASE WHEN s.name = 'J&T Turno fines de semana' THEN 1 ELSE 0 END) AS 'J&T_Turno_fines_de_semana',
+            MAX(CASE WHEN s.name = 'TP-V-D' THEN 1 ELSE 0 END) AS 'TP-V-D',
+            MAX(CASE WHEN s.name = 'TP-L-V' THEN 1 ELSE 0 END) AS 'TP-L-V',
+            MAX(CASE WHEN s.name = 'JT-Turno Doble V,D' THEN 1 ELSE 0 END) AS 'JT-Turno_Doble_V,D',
+            MAX(CASE WHEN s.name = 'JT-Turno Doble Nocturno' THEN 1 ELSE 0 END) AS 'JT-Turno Doble Nocturno',
+            MAX(CASE WHEN s.name = 'L-J' THEN 1 ELSE 0 END) AS 'L-J',
+            MAX(CASE WHEN s.name = 'L-J (40h)' THEN 1 ELSE 0 END) AS 'L-J_(40h)'
+        FROM
+            Vehicles v
+        LEFT JOIN
+            DriversVehiclesExchangeLocations dvel ON v.kendra_id = dvel.vehicle_id
+        LEFT JOIN
+            Drivers d ON dvel.driver_id = d.kendra_id
+        LEFT JOIN
+            Shifts s ON d.shift_id = s.id
+        WHERE
+            v.date = CURDATE()
+            AND v.status IN ('available', 'active')
+        GROUP BY
+            v.plate
+    """)
+
+    vehicle_shifts_df = pd.read_sql(query, engine)
+    vehicle_shifts_df = vehicle_shifts_df.drop(columns=[col for col in vehicle_shifts_df.columns if col not in columns])
+
+    return vehicle_shifts_df
+
+
 def fetch_exchange_locations():
     exchange_locations = ['Cambio fuera', 'Parking Reyes Magos', 'Parking Marqués de Urquijo']
     engine = connect(database)
