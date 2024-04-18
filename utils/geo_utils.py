@@ -198,3 +198,105 @@ def check_partitions_intersection(partitioned_drivers):
                 # Found common drivers between partitions i and j
                 return False
     return True
+
+
+################## Wailon API ##################
+
+from dotenv import load_dotenv
+thisdir = os.path.dirname(__file__)
+parentdir = os.path.dirname(thisdir)
+load_dotenv(os.path.join(parentdir, '.env'))
+import requests
+import json
+import urllib.parse
+import re
+
+def get_session_id():
+    token = os.environ.get('SHERLOG_TOKEN')
+    if not token:
+        raise ValueError("SHERLOG_TOKEN environment variable is not set.")
+
+    login_url = "https://hst-api.wialon.com/wialon/ajax.html?svc=token/login"
+    payload = {
+        "params": json.dumps({
+            "token": token
+        })
+    }
+
+    try:
+        response = requests.get(login_url, params=payload)
+        response.raise_for_status()
+        data = response.json()
+        if 'error' in data:
+            error_code = data['error']
+            error_message = data.get('reason', 'Unknown error')
+            raise ValueError(f"Error {error_code}: {error_message}")
+        session_id = data.get('eid')
+        if session_id is None:
+            raise ValueError("Session ID not found in the response.")
+        return session_id
+    except requests.exceptions.RequestException as e:
+        raise ValueError(f"Error occurred while getting session ID: {e}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Error occurred while parsing response: {e}")
+
+def lic_plate2sher_id_map():
+    session_id = get_session_id()
+    core_svc = "https://hst-api.wialon.com/wialon/ajax.html?svc=core/search_items&params="
+    coreprefix = {
+        "spec": {
+            "itemsType": "avl_unit",
+            "propName": "sys_id",
+            "propValueMask": "*",
+            "sortType": "sys_id",
+            "propType": "list"
+        },
+        "force": 1,
+        "flags": 1,
+        "from": 0,
+        "to": 0
+    }
+    coreprefix_json = json.dumps(coreprefix)
+    coreprefix_escaped = urllib.parse.quote(coreprefix_json)
+    url = core_svc + coreprefix_escaped + "&sid=" + session_id
+    r = requests.get(url)
+    payload = json.loads(r.text)
+    name2id = {}
+    for i in range(len(payload["items"])):
+        name = re.split(r"\W", payload["items"][i]["nm"])[0]
+        name2id[name] = payload["items"][i]["id"]
+    return name2id
+
+def get_last_coordinates_by_plate(plate, plates2ids=lic_plate2sher_id_map()):
+    session_id = get_session_id()
+    if plate not in plates2ids:
+        print(f"License plate '{plate}' not found in the database.")
+        return None
+
+    vehicle_id = plates2ids[plate]
+    core_svc = "https://hst-api.wialon.com/wialon/ajax.html?svc=core/search_item&params="
+    coreprefix = {
+        "id": vehicle_id,
+        "flags": 1025
+    }
+    coreprefix_json = json.dumps(coreprefix)
+    coreprefix_escaped = urllib.parse.quote(coreprefix_json)
+    url = core_svc + coreprefix_escaped + "&sid=" + session_id
+    r = requests.get(url)
+    payload = json.loads(r.text)
+
+    if "item" in payload and isinstance(payload["item"], dict):
+        item = payload["item"]
+        if "lmsg" in item and isinstance(item["lmsg"], dict):
+            last_message = item["lmsg"]
+            if "pos" in last_message and isinstance(last_message["pos"], dict):
+                pos = last_message["pos"]
+                if "y" in pos and "x" in pos:
+                    coords = {
+                        "lat": pos["y"],
+                        "lng": pos["x"]
+                    }
+                    return coords
+
+    print(f"Last known coordinates not found for license plate '{plate}'.")
+    return None
