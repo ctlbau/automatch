@@ -117,8 +117,6 @@ def sync_driver_vehicle_relationships(kndauth, localauth):
                         WHERE
                             v.status = 'active'
                             AND v.deleted_at IS NULL
-                            AND e.geolocation_latitude IS NOT NULL
-                            AND e.geolocation_longitude IS NOT NULL
                             AND e.status = 'active'
                         ORDER BY
                             e.id, v.id;
