@@ -43,9 +43,15 @@ def render_ui(tab):
     elif tab == 'vehicle-tab':
         plates_options = fetch_plates().to_dict('records')
         return [
-            create_dropdown('plate-dropdown', options=plates_options, label='plate', value='plate', placeholder='Select plate', multi=False, add_all=False),
-            create_date_range_picker('date-picker-range'),
-            html.Div(id='vehicle-view-graph-container', className="col-md-9 offset-md-2 col-12")
+            dbc.Container([
+                dbc.Row([
+                    dbc.Col([
+                        create_dropdown('plate-dropdown', options=plates_options, label='plate', value='plate', placeholder='Select plate', multi=False, add_all=False),
+                        create_date_range_picker('date-picker-range'),
+                        html.Div(id='vehicle-view-graph-container', className="col-6")
+                    ])
+                ])
+            ], fluid=True)
         ]
 
 @callback(
