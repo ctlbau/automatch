@@ -168,10 +168,10 @@ def calculate_block_holes(vehicle_shifts):
             elif row['block_3'] == True:
                 if row['Mañana'] == 0 and row['TP-L-V'] == 0:
                     hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'Mañana'] += 1
-            elif row['L-J'] == 0 and row['L-J_(40h)'] == 0:
-                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'L-J_(40h)'] += 1
-            elif row['TP-V-D'] == 0:
-                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'TP-V-D'] += 1
+                if row['L-J'] == 0 and row['L-J_(40h)'] == 0:
+                    hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'L-J_(40h)'] += 1
+                if row['TP-V-D'] == 0:
+                    hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'TP-V-D'] += 1
 
     total_by_manager_df = hole_counts.groupby(['manager', 'center']).sum().reset_index()
     total_by_manager_df['total'] = total_by_manager_df[['Mañana', 'Tarde', 'L-J_(40h)', 'TP-V-D']].sum(axis=1)
