@@ -14,7 +14,6 @@ MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9
 CHOSEN_STYLE = MAP_STYLES[0]
 MAPBOX_API_KEY = os.getenv("MAPBOX_TOKEN")
 
-
 def create_map_container(id):
         return html.Div([
             dcc.Loading(
@@ -273,7 +272,8 @@ def create_modal(modal_id, title_id, content_id, footer_id):
     )
 
 def create_data_table(id, data, filename, page_size=10, custom_height=None):
-    # remove _ from column names
+    if data.empty:
+        return html.Div("No data available")
     data.columns = data.columns.str.replace('_', ' ')
     columnDefs = [{"field": i} for i in data.columns]
     grid = dag.AgGrid(

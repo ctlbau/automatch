@@ -115,3 +115,67 @@ def sanity_check(expected_count, actual_count):
     if expected_count != actual_count:
         return f"Something is rotten in the state of Denmark: Expected {expected_count} rows, but found {actual_count}. Please contact Carlos at trebbau@auro-group.com"
     return None
+
+def calculate_block_holes(vehicle_shifts):
+    # Define blocks
+    vehicle_shifts['block_0'] = (vehicle_shifts[['Mañana', 'Tarde', 'Turno_Completo', 'TP-V-D', 'TP-L-V', 'L-J', 'L-J_(40h)']].sum(axis=1) == 0)
+    vehicle_shifts['block_1'] = (vehicle_shifts['Turno_Completo'] == 1)
+    vehicle_shifts['block_2'] = (vehicle_shifts['Tarde'] == 1)
+    vehicle_shifts['block_3'] = ((vehicle_shifts['L-J'] + vehicle_shifts['L-J_(40h)'] + vehicle_shifts['Mañana'] + vehicle_shifts['TP-L-V'] + vehicle_shifts['TP-V-D']) >= 1) & (vehicle_shifts['Tarde'] == 0) & (vehicle_shifts['Turno_Completo'] == 0)
+
+    ## Define holes in each block ##
+    # Block 0: All vehicles in block_0 are holes
+    vehicle_shifts['hole_block_0'] = vehicle_shifts['block_0']
+
+    # Block 1: No holes in block_1
+    vehicle_shifts['hole_block_1'] = False
+
+    # Block 2: Holes in block_2 if number_of_drivers < 2 and not in 'Mañana'
+    vehicle_shifts['hole_block_2'] = (
+        (vehicle_shifts['block_2'] == 1) &
+        (vehicle_shifts['Mañana'] == 0) &
+        (vehicle_shifts['number_of_drivers'] < 2))
+
+    # Block 3: Holes in block_3 if number_of_drivers < 3
+    vehicle_shifts['hole_block_3'] = (
+        (vehicle_shifts['block_3'] == 1) &
+        (vehicle_shifts['number_of_drivers'] < 3))
+
+    # Combine the holes from all blocks
+    vehicle_shifts['hole'] = (
+        vehicle_shifts['hole_block_0'] |
+        vehicle_shifts['hole_block_1'] |
+        vehicle_shifts['hole_block_2'] |
+        vehicle_shifts['hole_block_3'])
+    
+    # Init hole counts
+    holes = vehicle_shifts[vehicle_shifts['hole'] == True]
+    hole_counts = pd.DataFrame(columns=[ 'plate', 'manager', 'center', 'Mañana', 'Tarde', 'L-J_(40h)', 'TP-V-D'])
+
+    grouped_holes_df = holes.groupby(['plate', 'manager', 'center'])
+    for (plate, manager, center), group in grouped_holes_df:
+        hole_counts.loc[len(hole_counts)] = [plate, manager, center, 0, 0, 0, 0]
+    
+        for _, row in group.iterrows():
+            if row['block_0'] == True:
+                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'Mañana'] += 1
+                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'L-J_(40h)'] += 1
+                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'TP-V-D'] += 1
+            elif row['block_1'] == True:
+                pass
+            elif row['block_2'] == True:
+                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'Mañana'] += 1
+            elif row['block_3'] == True:
+                if row['Mañana'] == 0 and row['TP-L-V'] == 0:
+                    hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'Mañana'] += 1
+            elif row['L-J'] == 0 and row['L-J_(40h)'] == 0:
+                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'L-J_(40h)'] += 1
+            elif row['TP-V-D'] == 0:
+                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'TP-V-D'] += 1
+
+    total_by_manager_df = hole_counts.groupby(['manager', 'center']).sum().reset_index()
+    total_by_manager_df['total'] = total_by_manager_df[['Mañana', 'Tarde', 'L-J_(40h)', 'TP-V-D']].sum(axis=1)
+    total_by_manager_df.drop(columns=['plate'], inplace=True)
+
+    return total_by_manager_df
+
