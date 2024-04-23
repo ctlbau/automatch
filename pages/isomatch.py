@@ -112,7 +112,7 @@ iso_layout = html.Div([
         is_open=False,
         style={'marginTop': '20px'},
         ),
-    html.Div(create_map_container('isomatch-map', initial_view_coords=ATOCHA, tooltip_info=iso_tooltip), style={'width': '80%', 'position': 'relative', 'marginTop': '20px'}),
+    html.Div(create_map_container('isomatch-map', initial_view_coords=ATOCHA, tooltip_info=iso_tooltip, map_style=CHOSEN_STYLE), style={'width': '80%', 'position': 'relative', 'marginTop': '20px'}),
     html.Div(id='data-tables-container', children=[], style={'width': '75%', 'position': 'relative', 'marginTop': '20px'}),  # Container for dynamic data tables
 ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
 

@@ -13,7 +13,8 @@ ATOCHA = (-3.690633, 40.406785)
 MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
 CHOSEN_STYLE = MAP_STYLES[0]
 MAPBOX_API_KEY = os.getenv("MAPBOX_TOKEN")
-def create_map_container(id, initial_view_coords=ATOCHA, tooltip_info={}):
+
+def create_map_container(id, initial_view_coords=ATOCHA, tooltip_info={}, map_style=CHOSEN_STYLE):
         return dcc.Loading(
                 id="loading-map", 
                 children=[
@@ -28,7 +29,7 @@ def create_map_container(id, initial_view_coords=ATOCHA, tooltip_info={}):
                                     pitch=0,
                                     ),
                                 layers=[],
-                                map_style=CHOSEN_STYLE,                            
+                                map_style=map_style,                            
                             ).to_json(),
                             mapboxKey=MAPBOX_API_KEY,
                             tooltip=tooltip_info

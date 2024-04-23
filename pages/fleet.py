@@ -12,7 +12,7 @@ import pydeck as pdk
 import pandas as pd
 
 MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
-CHOSEN_STYLE = MAP_STYLES[0]
+CHOSEN_STYLE = MAP_STYLES[2]
 AURO = (-3.587811320499316, 40.39171586339568)
 
 
@@ -68,7 +68,7 @@ def render_ui(tab):
                         create_date_range_picker('date-picker-range'),
                         html.Div(id='alert-placeholder-vehicle'),
                         html.Div(id='vehicle-view-graph-container'),
-                        html.Div(create_map_container('last-location-map', initial_view_coords=AURO, tooltip_info={}), style={'width': '80%', 'position': 'relative', 'marginTop': '10px', 'marginLeft': 'auto', 'marginRight': 'auto'}),
+                        html.Div(create_map_container('last-location-map', initial_view_coords=AURO, tooltip_info={}, map_style=CHOSEN_STYLE), style={'width': '80%', 'position': 'relative', 'marginTop': '10px', 'marginLeft': 'auto', 'marginRight': 'auto'}),
                     ], width={'size': 10, 'offset': 2, 'align': 'center'}),
                 ])
             ], fluid=True)
