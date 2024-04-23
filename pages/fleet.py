@@ -7,6 +7,14 @@ import plotly.express as px
 from db.fleetpulse.db_support import fetch_managers, fetch_statuses, fetch_centers, fetch_vehicles, fetch_plates, select_plate
 from ui.components import *
 from utils.agg_utils import calculate_aggregations, calculate_status_periods, filter_and_format, sanity_check
+from utils.geo_utils import lic_plate2sher_id_map, get_last_coordinates_by_plate, geodecode_coordinates
+import pydeck as pdk
+import pandas as pd
+
+MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
+CHOSEN_STYLE = MAP_STYLES[0]
+AURO = (-3.587811320499316, 40.39171586339568)
+
 
 dash.register_page(__name__, path='/fleet')
 
@@ -16,13 +24,23 @@ layout = html.Div([
         dcc.Tab(label='Vehicle view', value='vehicle-tab'),
     ], className="col-md-3 offset-md-1 col-12"),
     html.Div(id='tabs-content'),
+    dcc.Store(id='plate-map-store'),
 ])
 
 @callback(
+    Output('plate-map-store', 'data'),
+    Input('tabs', 'value')
+)
+def update_plate_map_store(tab):
+    if tab == 'vehicle-tab':
+        plate_map = lic_plate2sher_id_map()
+        if plate_map:
+            return plate_map
+    return dash.no_update
+
+@callback(
     Output('tabs-content', 'children'),
-    [
-        Input('tabs', 'value')
-    ]
+    Input('tabs', 'value')
 )
 def render_ui(tab):
     if tab == 'manager-tab':
@@ -48,11 +66,74 @@ def render_ui(tab):
                     dbc.Col([
                         create_dropdown('plate-dropdown', options=plates_options, label='plate', value='plate', placeholder='Select plate', multi=False, add_all=False),
                         create_date_range_picker('date-picker-range'),
-                        html.Div(id='vehicle-view-graph-container', className="col-6")
-                    ])
+                        html.Div(id='alert-placeholder-vehicle'),
+                        html.Div(id='vehicle-view-graph-container'),
+                        html.Div(create_map_container('last-location-map', initial_view_coords=AURO, tooltip_info={}), style={'width': '80%', 'position': 'relative', 'marginTop': '10px', 'marginLeft': 'auto', 'marginRight': 'auto'}),
+                    ], width={'size': 10, 'offset': 2, 'align': 'center'}),
                 ])
             ], fluid=True)
         ]
+
+
+@callback(
+        Output('last-location-map', 'data'),
+        Output('alert-placeholder-vehicle', 'children'),
+        Input('plate-dropdown', 'value'),
+        State('plate-map-store', 'data')
+        )
+def update_map(selected_plate, plate_map):
+    if not selected_plate:
+        return dash.no_update
+    if selected_plate not in plate_map:
+        return dash.no_update, dbc.Alert(f"License plate '{selected_plate}' not found in Sherlog's database.", color="warning", className="col-md-4 offset-md-4 col-12")
+
+    coords = get_last_coordinates_by_plate(selected_plate, plate_map)
+    if not coords:
+        return dash.no_update, dbc.Alert(f"Valid coordinates for vehicle {selected_plate} not found.", color="danger", className="col-md-4 offset-md-4 col-12")
+    
+    lat, lon = float(coords['lat']), float(coords['lng'])
+    address = geodecode_coordinates(lat, lon)
+    
+    data = pd.DataFrame({
+        "lat": [lat],
+        "lon": [lon],
+        "plate": [selected_plate],
+        "address": [address] if address else ["Unknown"]
+    })
+    icon_data = {
+        "url": "https://img.icons8.com/ios-filled/50/000000/car--v1.png",
+        "width": 250,
+        "height": 250,
+    }
+
+    data.loc[:, "icon_data"] = None
+    for i in data.index:
+        data['icon_data'] = data.apply(lambda x: icon_data, axis=1)
+
+    icon_layer = pdk.Layer(
+        type="IconLayer",
+        data=data,
+        get_icon="icon_data",
+        get_size=8,
+        size_scale=5,
+        get_position=["lon", "lat"],
+        pickable=True,
+    )
+
+    view_state = pdk.ViewState(
+        longitude=lon,
+        latitude=lat,
+        zoom=16,
+        pitch=0,
+        bearing=0,
+    )
+
+    deck_data = pdk.Deck(
+        layers=[icon_layer],
+        initial_view_state=view_state,
+        map_style=CHOSEN_STYLE
+    ).to_json()
+    return deck_data, None
 
 @callback(
     Output('manager-view-graph-and-table-container', 'children'),
@@ -66,7 +147,7 @@ def render_ui(tab):
         Input('status-dropdown', 'value'),
         Input('count-proportion-radio', 'value'),
     ],
-    [State('status-dropdown', 'options')]
+    State('status-dropdown', 'options')
 )
 def update_managerview_table_and_graph(tab, start_date, end_date, selected_company, selected_centers, selected_manager, selected_statuses, count_proportion_radio, status_options):
     if tab != 'manager-tab':
@@ -118,15 +199,19 @@ def update_managerview_table_and_graph(tab, start_date, end_date, selected_compa
 
         return [fig, table, download_button]
     
-@callback(Output('main-table-all', 'exportDataAsCsv'),
-         [Input('download-main-table-all-csv', 'n_clicks')])
+@callback(
+        Output('main-table-all', 'exportDataAsCsv'),
+        Input('download-main-table-all-csv', 'n_clicks')
+        )
 def download_csv(n_clicks):
     if n_clicks > 0:
         return True
     return dash.no_update
 
-@callback(Output('main-table-part', 'exportDataAsCsv'),
-            [Input('download-main-table-part-csv', 'n_clicks')])
+@callback(
+        Output('main-table-part', 'exportDataAsCsv'),
+        Input('download-main-table-part-csv', 'n_clicks')
+        )
 def download_csv(n_clicks):
     if n_clicks > 0:
         return True
@@ -190,17 +275,21 @@ def update_modal_all(clicked_cell, clicked_row, companies, selected_centers, sta
 
     return True, modal_title, table, download_button
 
-@callback(Output('modal-content-all-total-unique', 'exportDataAsCsv'),
-         Input('download-modal-table-total-unique-csv', 'n_clicks'),
-         prevent_initial_call=True)
+@callback(
+        Output('modal-content-all-total-unique', 'exportDataAsCsv'),
+        Input('download-modal-table-total-unique-csv', 'n_clicks'),
+        prevent_initial_call=True
+        )
 def download_csv(n_clicks):
     if n_clicks > 0:
         return True
     return dash.no_update
 
-@callback(Output('modal-content-status', 'exportDataAsCsv'),
-            Input('download-modal-table-status-csv', 'n_clicks'),
-            prevent_initial_call=True)
+@callback(
+        Output('modal-content-status', 'exportDataAsCsv'),
+        Input('download-modal-table-status-csv', 'n_clicks'),
+        prevent_initial_call=True
+        )
 def download_csv(n_clicks):
     if n_clicks > 0:
         return True
@@ -241,7 +330,6 @@ def update_modal_part(clicked_cell, clicked_row, companies, selected_centers, st
     if column_selected == 'total unique':
         streaks_df = calculate_status_periods(status_df)
         status_df = status_df.merge(streaks_df, on='plate', how='left')
-        # status_df['date'] = status_df['date'].dt.strftime('%Y-%m-%d')
         status_df.drop(['date','status', 'date_diff', 'status_change', 'group'], axis=1, inplace=True)
         status_df.drop_duplicates(subset=['plate'], inplace=True)
         modal_title = f"Overview of {len(status_df)} vehicles that have been, at some point, in {status} status between {start_date} and {end_date}"
