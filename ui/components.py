@@ -15,9 +15,8 @@ CHOSEN_STYLE = MAP_STYLES[0]
 MAPBOX_API_KEY = os.getenv("MAPBOX_TOKEN")
 
 
-def create_map_container(id):
-        return html.Div([
-            dcc.Loading(
+def create_map_container(id, initial_view_coords=ATOCHA, tooltip_info={}):
+        return dcc.Loading(
                 id="loading-map", 
                 children=[
                     html.Div(
@@ -25,8 +24,8 @@ def create_map_container(id):
                             id=id,
                             data=pdk.Deck(
                                 initial_view_state=pdk.ViewState(
-                                    longitude=ATOCHA[0],
-                                    latitude=ATOCHA[1],
+                                    longitude=initial_view_coords[0],
+                                    latitude=initial_view_coords[1],
                                     zoom=5,
                                     pitch=0,
                                     ),
@@ -34,20 +33,13 @@ def create_map_container(id):
                                 map_style=CHOSEN_STYLE,                            
                             ).to_json(),
                             mapboxKey=MAPBOX_API_KEY,
-                            tooltip={
-                                "html": "<b>Name:</b> {name}<br><b>Street:</b> {street}<br><b>Manager:</b> {manager}<br><b>Shift:</b> {shift} <br> <b>Center:</b> {center}, <b>Matched:</b> {is_matched} <br> <b>Matched With:</b> {matched_with} <br> <b>Exchange Location:</b> {exchange_location}",
-                                "style": {
-                                    "backgroundColor": "steelblue",
-                                    "color": "white"
-                                }
-                            }
+                            tooltip=tooltip_info
                         ),
                         style={'height': '50vh', 'width': '100%'}  # Set the size of the map here
                     )
                 ], 
                 type="circle"
-            ),
-        ], style={'width': '80%', 'position': 'relative', 'marginTop': '20px'})
+            )
 
 
 def create_navbar(title):
@@ -83,31 +75,6 @@ def create_company_filter(id):
                             clearable=False,
                             placeholder="Select company"
                         ), className="col-md-4 offset-md-4 col-12"
-                    )
-                ]
-            )
-        ]
-    )
-
-def create_dropdown(id, options, label='name', value='id', placeholder='Select an option', multi=False, add_all=False):
-    options = [{'label': option[label], 'value': option[value]} for option in options]
-    if add_all:
-        options = [{'label': 'All', 'value': 0}] + options
-    return html.Nav(
-        className="navbar navbar-expand-lg mb-2",
-        children=[
-            html.Div(
-                className="container-fluid",
-                children=[
-                    html.Div(
-                        dcc.Dropdown(
-                            id=id,
-                            options=options,
-                            value=[],
-                            multi=multi,
-                            clearable=True,
-                            placeholder=placeholder,
-                        ), className="col-md-4 offset-md-4 col-12",
                     )
                 ]
             )
@@ -181,31 +148,6 @@ def create_plate_filter(id):
         ]
     )
 
-def create_date_range_picker(id):
-    today = datetime.today().date()
-    seven_days_prior = today - timedelta(days=7)
-    min_date, max_date = fetch_date_range()
-    return html.Nav(
-        className="navbar navbar-expand-lg mb-2",
-        children=[
-            html.Div(
-                className="container-fluid",
-                children=[
-                    html.Div(
-                        dcc.DatePickerRange(
-                            id=id,
-                            start_date=seven_days_prior,
-                            end_date=today,
-                            min_date_allowed=min_date,
-                            max_date_allowed=max_date,
-                            display_format='D MMM YY',
-                        ), className="col-md-4 offset-md-4 col-12"
-                    )
-                ]
-            )
-        ]
-    )
-
 
 manager_filter = html.Nav(
     className="navbar navbar-expand-lg mb-2",
@@ -251,6 +193,58 @@ def create_navbar_options(count_or_proportion_id):
             )
         ]
     )
+
+def create_date_range_picker(id):
+    today = datetime.today().date()
+    seven_days_prior = today - timedelta(days=7)
+    min_date, max_date = fetch_date_range()
+    return html.Nav(
+        className="navbar navbar-expand-lg mb-2",
+        children=[
+            html.Div(
+                className="container-fluid",
+                children=[
+                    html.Div(
+                        dcc.DatePickerRange(
+                            id=id,
+                            start_date=seven_days_prior,
+                            end_date=today,
+                            min_date_allowed=min_date,
+                            max_date_allowed=max_date,
+                            display_format='D MMM YY',
+                        ), className="col-md-4 offset-md-4 col-12"
+                    )
+                ]
+            )
+        ]
+    )
+
+
+def create_dropdown(id, options, label='name', value='id', placeholder='Select an option', multi=False, add_all=False, class_name="col-md-4 offset-md-4 col-12"):
+    options = [{'label': option[label], 'value': option[value]} for option in options]
+    if add_all:
+        options = [{'label': 'All', 'value': 0}] + options
+    return html.Nav(
+        className="navbar navbar-expand-lg mb-2",
+        children=[
+            html.Div(
+                className="container-fluid",
+                children=[
+                    html.Div(
+                        dcc.Dropdown(
+                            id=id,
+                            options=options,
+                            value=[],
+                            multi=multi,
+                            clearable=True,
+                            placeholder=placeholder,
+                        ), className=class_name,
+                    )
+                ]
+            )
+        ]
+    )
+
 
 
 def create_modal(modal_id, title_id, content_id, footer_id):
