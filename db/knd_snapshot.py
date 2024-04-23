@@ -441,6 +441,8 @@ def fetch_and_insert_drivers(kndauth, localauth, manager_df):
         INNER JOIN shift s ON s.id = es.shift_id
         
     WHERE
+        # e.geolocation_latitude IS NOT NULL
+        # AND e.geolocation_longitude IS NOT NULL
         e.status = 'active'
         AND (es.end_date IS NULL OR es.end_date >= date(now()))
         AND es.start_date <= date(now())

@@ -2,8 +2,8 @@ import os
 import dash
 import dash_deck as dd
 from dash_deck import DeckGL
-from dash import html, dcc, callback, MATCH
 import pydeck as pdk
+from dash import html, dcc, callback, MATCH
 from utils.geo_utils import geoencode_address, calculate_isochrones, partition_drivers_by_isochrones, extract_coords_from_encompassing_isochrone, check_partitions_intersection, calculate_driver_distances_and_paths
 from utils.agg_utils import get_manager_stats
 from db.automatch import fetch_drivers, fetch_shifts, fetch_managers, fetch_centers, fetch_provinces, fetch_exchange_locations
@@ -20,6 +20,21 @@ MAPBOX_API_KEY = os.getenv("MAPBOX_TOKEN")
 ATOCHA = (-3.690633, 40.406785)
 MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
 CHOSEN_STYLE = MAP_STYLES[0]
+
+iso_tooltip={
+    "html": """<b>Name:</b> {name}<br>
+               <b>Street:</b> {street}<br>
+               <b>Manager:</b> {manager}<br>
+               <b>Shift:</b> {shift} <br> 
+               <b>Center:</b> {center} <br> 
+               <b>Matched:</b> {is_matched} <br> 
+               <b>Matched With:</b> {matched_with} <br>
+               <b>Exchange Location:</b> {exchange_location}""",
+    "style": {
+        "backgroundColor": "steelblue",
+        "color": "white"
+        }
+        }
 
 iso_layout = html.Div([
     html.Div([
@@ -97,7 +112,7 @@ iso_layout = html.Div([
         is_open=False,
         style={'marginTop': '20px'},
         ),
-    create_map_container('isomatch-map'),
+    html.Div(create_map_container('isomatch-map', initial_view_coords=ATOCHA, tooltip_info=iso_tooltip), style={'width': '80%', 'position': 'relative', 'marginTop': '20px'}),
     html.Div(id='data-tables-container', children=[], style={'width': '75%', 'position': 'relative', 'marginTop': '20px'}),  # Container for dynamic data tables
 ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
 
@@ -111,7 +126,8 @@ stats_layout = html.Div([
         value='id',
         placeholder='Select an exchange location',
         multi=False,
-        add_all=True
+        add_all=True,
+        class_name="col-md-4 offset-md-4 col-12"
         ),
     dcc.Loading(
         id="loading-peak-container",

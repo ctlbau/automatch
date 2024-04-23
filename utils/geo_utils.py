@@ -6,6 +6,9 @@ import geopandas as gpd
 from shapely.geometry import shape
 from shapely.geometry import LineString
 import polyline
+import json
+import urllib.parse
+import re
 
 MAPBOX_API_KEY = os.environ["MAPBOX_TOKEN"]
 FIVE_MINUTES = 300
@@ -13,40 +16,30 @@ BASE_URL = "http://localhost:8989"
 
 def calculate_driver_distances_and_paths(gdf):
     pathurl = f"{BASE_URL}/route"
-    # print(f"Calculating distances and paths for {len(gdf)} drivers...")
     
-    # Create new columns to store the calculated distances and paths
     gdf["distance"] = None
     gdf["path"] = None
     
-    # Create a list to store the error information
     errors = []
     
-    # Iterate over each row in the GeoDataFrame
     for index, row in gdf.iterrows():
-        # Check if the driver is matched
         if row["is_matched"]:
             # Extract the driver's coordinates from the geometry column
             driver_coords = row["geometry"]
             driver_lng, driver_lat = driver_coords.x, driver_coords.y        
             matched_driver_id = row["matched_driver_id"]
             
-            # Find the matched driver's coordinates
             matched_driver = gdf[gdf["driver_id"] == matched_driver_id]
             if not matched_driver.empty:
                 matched_driver_coords = matched_driver["geometry"].values[0]
                 matched_driver_lng, matched_driver_lat = matched_driver_coords.x, matched_driver_coords.y
                 
-                # Set the query parameters for the API request
                 params = {
                     "point": [f"{driver_lat},{driver_lng}", f"{matched_driver_lat},{matched_driver_lng}"],
                     "profile": "car"
                 }
                 
-                # Send the GET request to the API
                 response = req.get(pathurl, params=params)
-                
-                # Check if the request was successful
                 if response.status_code == 200:
                     data = response.json()
                     
@@ -71,7 +64,6 @@ def calculate_driver_distances_and_paths(gdf):
                     gdf.at[index, "distance"] = distance
                     gdf.at[index, "path"] = path_geometry
                 else:
-                    # Store the error information
                     error_info = {
                         "driver_id": row["driver_id"],
                         "matched_driver_id": matched_driver_id,
@@ -81,7 +73,6 @@ def calculate_driver_distances_and_paths(gdf):
                     }
                     errors.append(error_info)
             else:
-                # Store the error information for unmatched driver
                 error_info = {
                     "driver_id": row["driver_id"],
                     "matched_driver_id": matched_driver_id,
@@ -91,11 +82,9 @@ def calculate_driver_distances_and_paths(gdf):
                 }
                 errors.append(error_info)
     
-    # Create a DataFrame from the error information with clear columns
     error_df = pd.DataFrame(errors, columns=["driver_id", "matched_driver_id", "error_code", "error_message", "suggested_action"])
     
     return gdf, error_df
-
 
 
 def geoencode_address(address: str, province: str, postal_code: str):
@@ -111,6 +100,29 @@ def geoencode_address(address: str, province: str, postal_code: str):
         return data[0]['lat'], data[0]['lon']
     except json.JSONDecodeError:
         print(f'Failed to decode JSON from response. Status Code: {response.status_code}, Response Text: {response.text}')
+        return None
+
+def geodecode_coordinates(lat, lon):
+    """
+    Convert latitude and longitude to a human-readable address using the Nominatim API.
+
+    Parameters:
+    - lat (float): Latitude of the location.
+    - lon (float): Longitude of the location.
+
+    Returns:
+    - str: The closest address to the provided latitude and longitude, or an error message.
+    """
+    url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+
+    response = requests.get(url, headers={"User-Agent": "AuroPulse/1.0 (ctrebbau@pm.me)"})
+
+    if response.status_code == 200:
+        data = response.json()
+        address = data.get("display_name")
+        if address:
+            return address
+    else:
         return None
 
 def calculate_isochrones(lat: float, lon: float, times: list) -> dict:
@@ -161,7 +173,6 @@ def partition_drivers_by_isochrones(drivers_gdf, isochrones):
     """
     partitioned_drivers = []
     remaining_drivers = drivers_gdf.copy()
-    # make remaining_drivers unique
     remaining_drivers = remaining_drivers.drop_duplicates(subset=['driver_id'])
     isochrone_geoms = extract_geometries_from_feature_collection(isochrones)
     for isochrone in isochrone_geoms:
@@ -193,8 +204,106 @@ def check_partitions_intersection(partitioned_drivers):
         for j in range(i + 1, num_partitions):
             # Check if there is any common index between partition i and partition j
             if not partitioned_drivers[i].index.isin(partitioned_drivers[j].index).any():
-                continue  # No common drivers, check the next pair
+                continue 
             else:
                 # Found common drivers between partitions i and j
                 return False
     return True
+
+
+################## Wailon API ##################
+
+from dotenv import load_dotenv
+thisdir = os.path.dirname(__file__)
+parentdir = os.path.dirname(thisdir)
+load_dotenv(os.path.join(parentdir, '.env'))
+
+def get_session_id():
+    token = os.environ.get('SHERLOG_TOKEN')
+    if not token:
+        raise ValueError("SHERLOG_TOKEN environment variable is not set.")
+
+    login_url = "https://hst-api.wialon.com/wialon/ajax.html?svc=token/login"
+    payload = {
+        "params": json.dumps({
+            "token": token
+        })
+    }
+
+    try:
+        response = req.get(login_url, params=payload)
+        response.raise_for_status()
+        data = response.json()
+        if 'error' in data:
+            error_code = data['error']
+            error_message = data.get('reason', 'Unknown error')
+            raise ValueError(f"Error {error_code}: {error_message}")
+        session_id = data.get('eid')
+        if session_id is None:
+            raise ValueError("Session ID not found in the response.")
+        return session_id
+    except req.exceptions.RequestException as e:
+        raise ValueError(f"Error occurred while getting session ID: {e}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Error occurred while parsing response: {e}")
+
+def lic_plate2sher_id_map():
+    session_id = get_session_id()
+    core_svc = "https://hst-api.wialon.com/wialon/ajax.html?svc=core/search_items&params="
+    coreprefix = {
+        "spec": {
+            "itemsType": "avl_unit",
+            "propName": "sys_id",
+            "propValueMask": "*",
+            "sortType": "sys_id",
+            "propType": "list"
+        },
+        "force": 1,
+        "flags": 1,
+        "from": 0,
+        "to": 0
+    }
+    coreprefix_json = json.dumps(coreprefix)
+    coreprefix_escaped = urllib.parse.quote(coreprefix_json)
+    url = core_svc + coreprefix_escaped + "&sid=" + session_id
+    r = req.get(url)
+    payload = json.loads(r.text)
+    name2id = {}
+    for i in range(len(payload["items"])):
+        name = re.split(r"\W", payload["items"][i]["nm"])[0]
+        name2id[name] = payload["items"][i]["id"]
+    return name2id
+
+def get_last_coordinates_by_plate(plate, plates2ids=lic_plate2sher_id_map()):
+    session_id = get_session_id()
+    if plate not in plates2ids:
+        print(f"License plate '{plate}' not found in the database.")
+        return None
+
+    vehicle_id = plates2ids[plate]
+    core_svc = "https://hst-api.wialon.com/wialon/ajax.html?svc=core/search_item&params="
+    coreprefix = {
+        "id": vehicle_id,
+        "flags": 1025
+    }
+    coreprefix_json = json.dumps(coreprefix)
+    coreprefix_escaped = urllib.parse.quote(coreprefix_json)
+    url = core_svc + coreprefix_escaped + "&sid=" + session_id
+    r = req.get(url)
+    payload = json.loads(r.text)
+
+    if "item" in payload and isinstance(payload["item"], dict):
+        item = payload["item"]
+        if "lmsg" in item and isinstance(item["lmsg"], dict):
+            last_message = item["lmsg"]
+            if "pos" in last_message and isinstance(last_message["pos"], dict):
+                pos = last_message["pos"]
+                if "y" in pos and "x" in pos:
+                    coords = {
+                        "lat": pos["y"],
+                        "lng": pos["x"]
+                    }
+                    return coords
+
+    print(f"Last known coordinates not found for license plate '{plate}'.")
+    return None
