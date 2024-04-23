@@ -177,5 +177,19 @@ def calculate_block_holes(vehicle_shifts):
     total_by_manager_df['total'] = total_by_manager_df[['Mañana', 'Tarde', 'L-J_(40h)', 'TP-V-D']].sum(axis=1)
     total_by_manager_df.drop(columns=['plate'], inplace=True)
 
+    consolidated_total_df = pd.DataFrame({
+    'manager': ['Total'],
+    'center': [''],
+    'Mañana': [total_by_manager_df['Mañana'].sum()],
+    'Tarde': [total_by_manager_df['Tarde'].sum()],
+    'L-J_(40h)': [total_by_manager_df['L-J_(40h)'].sum()],
+    'TP-V-D': [total_by_manager_df['TP-V-D'].sum()],
+    'total': [total_by_manager_df['total'].sum()]
+    })
+
+    total_by_manager_df = pd.concat([total_by_manager_df, consolidated_total_df], ignore_index=True)
+
     return total_by_manager_df
+
+
 

@@ -6,6 +6,7 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 from utils.agg_utils import calculate_block_holes
 from ui.components import create_data_table
+from datetime import datetime
 
 dash.register_page(__name__, path='/blockbuster')
 
@@ -15,6 +16,7 @@ layout = html.Div([
         dbc.Row([
             dbc.Col([
                 html.Div(id='block-holes-container', children=[]),
+                html.Button('Download CSV', id='download-block-holes-csv', n_clicks=0)
                 ])
             ])
         ])
@@ -35,7 +37,8 @@ def update_data_table(pathname):
         # urquijo_block_holes = calculate_block_holes(vehicle_shifts_urquijo)
         
         # Create the data table component
-        general_block_holes_grid = create_data_table('block-holes-grid', general_block_holes, 'general_block_holes.csv', 25 ,custom_height='1000px')
+        today = datetime.today().strftime('%Y-%m-%d')
+        general_block_holes_grid = create_data_table('block-holes-grid', general_block_holes, f'block_holes_{today}.csv', 27 ,custom_height='1000px')
         # reyes_magos_block_holes_grid = create_data_table('block-holes-grid', reyes_magos_block_holes, 'reyes_magos_block_holes.csv', 10)
         # urquijo_block_holes_grid = create_data_table('block-holes-grid', urquijo_block_holes, 'urquijo_block_holes.csv', 10)
         
@@ -43,3 +46,11 @@ def update_data_table(pathname):
     else:
         return None
 
+@callback(
+        Output('block-holes-grid', 'exportDataAsCsv'),
+        Input('download-block-holes-csv', 'n_clicks')
+        )
+def download_csv(n_clicks):
+    if n_clicks > 0:
+        return True
+    return dash.no_update
