@@ -27,7 +27,7 @@ def upgrade() -> None:
         op.create_table('Managers',
                         sa.Column('id', sa.Integer, primary_key=True),
                         sa.Column('name', sa.String(50), nullable=False),
-                        sa.Index('ixd_managers_name', 'name'))
+                        sa.Index('idx_managers_name', 'name'))
 
     if 'Shifts' not in tables:
         op.create_table('Shifts',
@@ -79,7 +79,7 @@ def upgrade() -> None:
                         sa.Column('center_id', sa.Integer, sa.ForeignKey('Centers.id'), nullable=False),
                         sa.Column('manager_id', sa.Integer, sa.ForeignKey('Managers.id'), nullable=True),
                         sa.PrimaryKeyConstraint('date', 'plate'),
-                        sa.Index('ixd_vehicles_plate', 'plate'),
+                        sa.Index('idx_vehicles_plate', 'plate'),
                         sa.Index('idx_kendra_id', 'kendra_id'))
 
 def downgrade() -> None:

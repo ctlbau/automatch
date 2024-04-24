@@ -115,7 +115,7 @@ def geodecode_coordinates(lat, lon):
     """
     url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
 
-    response = requests.get(url, headers={"User-Agent": "AuroPulse/1.0 (ctrebbau@pm.me)"})
+    response = req.get(url, headers={"User-Agent": "AuroPulse/1.0 (ctrebbau@pm.me)"})
 
     if response.status_code == 200:
         data = response.json()

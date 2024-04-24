@@ -18,12 +18,11 @@ def fetch_vehicle_shifts(exchange_locations=None, gestores=None):
     columns = ["plate", "Mañana", "Tarde", "TP-V-D", "TP-L-V", "L-J", "L-J_(40h)", "Turno_Completo", "number_of_drivers", "manager", "center", "exchange_location", "driver_ids"]
     
     if gestores is None:
-        gestores = ["Alejandro Garcia Coscolla", "Alfonso Pradas Mateos", "Carlos Sanchez-Fuentes Garcia", "Daniel Gonzalo Garcia", "Deogracias Sanchez Muñoz", "Emilio Barberan Casanova", "Fernando Mario Fernández Pérez", "Francisco Gómez Martín", "Gonzalo Torralba Rodriguez", "Irene Hinojal Berbis", "Javier Mendez Moreno", "Jesus Pablo Diaz Blazquez", "Jose Antonio Lage Barrantes", "Olga Rosas Roman", "Pedro Arribas Dorado"]
+        gestores = ["Alejandro Garcia Coscolla", "Alfonso Pradas Mateos", "Carlos Sanchez-Fuentes Garcia", "Daniel Gonzalo Garcia", "Deogracias Sanchez  Muñoz", "Emilio Barberan Casanova", "Fernando Mario Fernández Pérez", "Francisco Gómez Martín", "Gonzalo Torralba Rodriguez", "Irene Hinojal Berbis", "Javier Mendez Moreno", "Jesus Pablo Diaz Blazquez", "Jose Antonio Lage Barrantes", "Olga Rosas Roman", "Pedro Arribas Dorado"]
         gestores = ', '.join(f"'{g}'" for g in gestores)
         gestores_condition = f"AND m.name IN ({gestores})"
     else:
-        gestores = ', '.join(f"'{g}'" for g in gestores)
-        gestores_condition = f"AND m.name IN ({gestores})"
+        gestores_condition = ""
     
     if exchange_locations:
         exchange_locations = ', '.join(f"'{el}'" for el in exchange_locations)
@@ -46,7 +45,7 @@ def fetch_vehicle_shifts(exchange_locations=None, gestores=None):
             MAX(CASE WHEN s.name = 'L-J' THEN 1 ELSE 0 END) AS 'L-J',
             MAX(CASE WHEN s.name = 'L-J (40h)' THEN 1 ELSE 0 END) AS 'L-J_(40h)',
             COUNT(DISTINCT dvel.driver_id) AS number_of_drivers,
-            GROUP_CONCAT(DISTINCT dvel.driver_id ORDER BY dvel.driver_id SEPARATOR ', ') AS driver_ids,
+            # GROUP_CONCAT(DISTINCT dvel.driver_id ORDER BY dvel.driver_id SEPARATOR ', ') AS driver_ids,
             m.name AS manager,
             c.name AS center,
             el.name AS exchange_location
