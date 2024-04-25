@@ -1,7 +1,5 @@
 import os
 import pandas as pd
-import geopandas as gpd
-import numpy as np
 from sqlalchemy import text
 from db.db_connect import localauth_dev, localauth_stg, localauth_prod, connect
 
@@ -13,9 +11,41 @@ elif app_env == 'dev':
 else:
     database = localauth_prod
 
-def fetch_vehicle_shifts(exchange_locations=None, gestores=None):
+
+def fetch_date_range():
     engine = connect(database)
-    columns = ["plate", "Mañana", "Tarde", "TP-V-D", "TP-L-V", "L-J", "L-J_(40h)", "Turno_Completo", "number_of_drivers", "manager", "center", "exchange_location", "driver_ids"]
+    query = text("SELECT MIN(date) AS min_date, MAX(date) AS max_date FROM VehicleShiftsHistorical;")
+    with engine.connect() as connection:
+        result = connection.execute(query).fetchone()
+    min_date, max_date = result
+    return min_date, max_date
+
+def fetch_exchange_locations():
+    exchange_locations = ['Cambio fuera', 'Parking Reyes Magos', 'Parking Marqués de Urquijo']
+    engine = connect(database)
+    query = text("SELECT id, name FROM ExchangeLocations;")
+    exchange_locations_df = pd.read_sql(query, engine)
+    exchange_locations_df = exchange_locations_df.sort_values(by='name')
+    exchange_locations_df = exchange_locations_df[exchange_locations_df["name"].isin(exchange_locations)]
+    return exchange_locations_df
+
+def fetch_centers():
+    engine = connect(database)
+    query = text("SELECT id, name FROM Centers;")
+    centers_df = pd.read_sql(query, engine)
+    centers_df = centers_df.sort_values(by='name')
+    return centers_df
+
+def fetch_managers():
+    engine = connect(database)
+    query = text("SELECT id, name FROM Managers;")
+    managers_df = pd.read_sql(query, engine)
+    managers_df = managers_df.sort_values(by='name')
+    return managers_df
+
+def create_vehicle_shifts(exchange_locations=None, gestores=None):
+    engine = connect(database)
+    columns = ["plate", "manana", "tarde", "tp_v_d", "tp_l_v", "l_j", "l_j_40h", "turno_completo", "number_of_drivers", "manager", "center", "exchange_location", "driver_ids"]
     
     if gestores is None:
         gestores = ["Alejandro Garcia Coscolla", "Alfonso Pradas Mateos", "Carlos Sanchez-Fuentes Garcia", "Daniel Gonzalo Garcia", "Deogracias Sanchez  Muñoz", "Emilio Barberan Casanova", "Fernando Mario Fernández Pérez", "Francisco Gómez Martín", "Gonzalo Torralba Rodriguez", "Irene Hinojal Berbis", "Javier Mendez Moreno", "Jesus Pablo Diaz Blazquez", "Jose Antonio Lage Barrantes", "Olga Rosas Roman", "Pedro Arribas Dorado"]
@@ -33,19 +63,18 @@ def fetch_vehicle_shifts(exchange_locations=None, gestores=None):
     query = f"""
         SELECT 
             v.plate,
-            MAX(CASE WHEN s.name = 'Mañana' THEN 1 ELSE 0 END) AS 'Mañana',
-            MAX(CASE WHEN s.name = 'Tarde' THEN 1 ELSE 0 END) AS 'Tarde',
-            MAX(CASE WHEN s.name = 'Turno Completo' THEN 1 ELSE 0 END) AS 'Turno_Completo',
-            MAX(CASE WHEN s.name = 'J&T Turno diario' THEN 1 ELSE 0 END) AS 'J&T_Turno_diario',
-            MAX(CASE WHEN s.name = 'J&T Turno fines de semana' THEN 1 ELSE 0 END) AS 'J&T_Turno_fines_de_semana',
-            MAX(CASE WHEN s.name = 'TP-V-D' THEN 1 ELSE 0 END) AS 'TP-V-D',
-            MAX(CASE WHEN s.name = 'TP-L-V' THEN 1 ELSE 0 END) AS 'TP-L-V',
-            MAX(CASE WHEN s.name = 'JT-Turno Doble V,D' THEN 1 ELSE 0 END) AS 'JT-Turno_Doble_V,D',
-            MAX(CASE WHEN s.name = 'JT-Turno Doble Nocturno' THEN 1 ELSE 0 END) AS 'JT-Turno Doble Nocturno',
-            MAX(CASE WHEN s.name = 'L-J' THEN 1 ELSE 0 END) AS 'L-J',
-            MAX(CASE WHEN s.name = 'L-J (40h)' THEN 1 ELSE 0 END) AS 'L-J_(40h)',
+            MAX(CASE WHEN s.name = 'Mañana' THEN 1 ELSE 0 END) AS 'manana',
+            MAX(CASE WHEN s.name = 'Tarde' THEN 1 ELSE 0 END) AS 'tarde',
+            MAX(CASE WHEN s.name = 'Turno Completo' THEN 1 ELSE 0 END) AS 'turno_completo',
+            MAX(CASE WHEN s.name = 'J&T Turno diario' THEN 1 ELSE 0 END) AS 'j&t_Turno_diario',
+            MAX(CASE WHEN s.name = 'J&T Turno fines de semana' THEN 1 ELSE 0 END) AS 'j&t_turno_fines_de_semana',
+            MAX(CASE WHEN s.name = 'TP-V-D' THEN 1 ELSE 0 END) AS 'tp_v_d',
+            MAX(CASE WHEN s.name = 'TP-L-V' THEN 1 ELSE 0 END) AS 'tp_l_v',
+            MAX(CASE WHEN s.name = 'JT-Turno Doble V,D' THEN 1 ELSE 0 END) AS 'jt_turno_doble_v,d',
+            MAX(CASE WHEN s.name = 'JT-Turno Doble Nocturno' THEN 1 ELSE 0 END) AS 'jt_turno_doble_nocturno',
+            MAX(CASE WHEN s.name = 'L-J' THEN 1 ELSE 0 END) AS 'l_j',
+            MAX(CASE WHEN s.name = 'L-J (40h)' THEN 1 ELSE 0 END) AS 'l_j_40h',
             COUNT(DISTINCT dvel.driver_id) AS number_of_drivers,
-            # GROUP_CONCAT(DISTINCT dvel.driver_id ORDER BY dvel.driver_id SEPARATOR ', ') AS driver_ids,
             m.name AS manager,
             c.name AS center,
             el.name AS exchange_location

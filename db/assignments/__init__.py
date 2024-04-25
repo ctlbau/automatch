@@ -1,1 +1,1 @@
-from .db_support import fetch_vehicle_shifts
+from .db_support import create_vehicle_shifts
