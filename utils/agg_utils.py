@@ -19,11 +19,14 @@ def calculate_aggregations(base_df, group_columns):
     return proportion_data
 
 def get_manager_stats(df, case='All'):
-    # Group by manager and calculate total_drivers for all cases
     total_drivers = df.groupby('manager')['driver_id'].count().reset_index(name='total_drivers')
 
+    columns_order = [
+            'manager', 'total_drivers', 'matched_drivers', 'unmatched_drivers', 'matched_percentage',
+            'avg_distance', 'median_distance', 'min_distance', 'max_distance'
+        ]
+
     if case == 'All':
-        # Group by manager and calculate statistics for all cases
         manager_stats = df.groupby('manager').agg(
             total_drivers=('driver_id', 'count'),
             matched_drivers=('is_matched', 'sum'),
@@ -35,31 +38,29 @@ def get_manager_stats(df, case='All'):
         ).reset_index()
 
         manager_stats['matched_percentage'] = round(manager_stats['matched_drivers'] / manager_stats['total_drivers'] * 100, 2)
-
-        # Reorder columns
-        columns_order = [
-            'manager', 'total_drivers', 'matched_drivers', 'unmatched_drivers', 'matched_percentage',
-            'avg_distance', 'median_distance', 'min_distance', 'max_distance'
-        ]
+        
         manager_stats = manager_stats[columns_order]
+        manager_stats['exchange_location'] = "General"
     else:
-        # Group by manager and calculate statistics for the specified case
         manager_stats = df[df['exchange_location'] == case].groupby('manager').agg(
             count=('exchange_location', 'count'),
-            matched_count=('is_matched', 'sum'),
+            matched_drivers=('is_matched', 'sum'),
+            unmatched_drivers=('is_matched', lambda x: (x == 0).sum()),
             avg_distance=('distance', lambda x: round(x.mean() / 1000, 2)),
             median_distance=('distance', lambda x: round(x.median() / 1000, 2)),
             min_distance=('distance', lambda x: round(x.min() / 1000, 2)),
             max_distance=('distance', lambda x: round(x.max() / 1000, 2))
         ).reset_index()
 
-        manager_stats['matched_percentage'] = round(manager_stats['matched_count'] / manager_stats['count'] * 100, 2)
+        manager_stats['matched_percentage'] = round(manager_stats['matched_drivers'] / manager_stats['count'] * 100, 2)
         manager_stats = manager_stats.merge(total_drivers, on='manager', how='left')
         manager_stats['percentage'] = round(manager_stats['count'] / manager_stats['total_drivers'] * 100, 2)
 
         manager_stats = manager_stats.drop('total_drivers', axis=1)
-        # manager_stats.columns = [f"{case}_{col}" if col != 'manager' else col for col in manager_stats.columns]
-
+        manager_stats = manager_stats.rename(columns={'count': 'total_drivers'})
+        manager_stats = manager_stats[columns_order]
+        manager_stats['exchange_location'] = case
+    
     return manager_stats
 
 def calculate_status_periods(base_df):
@@ -118,10 +119,10 @@ def sanity_check(expected_count, actual_count):
 
 def calculate_block_holes(vehicle_shifts):
     # Define blocks
-    vehicle_shifts['block_0'] = (vehicle_shifts[['Mañana', 'Tarde', 'Turno_Completo', 'TP-V-D', 'TP-L-V', 'L-J', 'L-J_(40h)']].sum(axis=1) == 0)
-    vehicle_shifts['block_1'] = (vehicle_shifts['Turno_Completo'] == 1)
-    vehicle_shifts['block_2'] = (vehicle_shifts['Tarde'] == 1)
-    vehicle_shifts['block_3'] = ((vehicle_shifts['L-J'] + vehicle_shifts['L-J_(40h)'] + vehicle_shifts['Mañana'] + vehicle_shifts['TP-L-V'] + vehicle_shifts['TP-V-D']) >= 1) & (vehicle_shifts['Tarde'] == 0) & (vehicle_shifts['Turno_Completo'] == 0)
+    vehicle_shifts['block_0'] = (vehicle_shifts[['manana', 'tarde', 'turno_completo', 'tp_v_d', 'tp_l_v', 'l_j', 'l_j_40h']].sum(axis=1) == 0)
+    vehicle_shifts['block_1'] = (vehicle_shifts['turno_completo'] == 1)
+    vehicle_shifts['block_2'] = (vehicle_shifts['tarde'] == 1)
+    vehicle_shifts['block_3'] = ((vehicle_shifts['l_j'] + vehicle_shifts['l_j_40h'] + vehicle_shifts['manana'] + vehicle_shifts['tp_l_v'] + vehicle_shifts['tp_v_d']) >= 1) & (vehicle_shifts['tarde'] == 0) & (vehicle_shifts['turno_completo'] == 0)
 
     ## Define holes in each block ##
     # Block 0: All vehicles in block_0 are holes
@@ -133,7 +134,7 @@ def calculate_block_holes(vehicle_shifts):
     # Block 2: Holes in block_2 if number_of_drivers < 2 and not in 'Mañana'
     vehicle_shifts['hole_block_2'] = (
         (vehicle_shifts['block_2'] == 1) &
-        (vehicle_shifts['Mañana'] == 0) &
+        (vehicle_shifts['manana'] == 0) &
         (vehicle_shifts['number_of_drivers'] < 2))
 
     # Block 3: Holes in block_3 if number_of_drivers < 3
@@ -150,7 +151,7 @@ def calculate_block_holes(vehicle_shifts):
     
     # Init hole counts
     holes = vehicle_shifts[vehicle_shifts['hole'] == True]
-    hole_counts = pd.DataFrame(columns=[ 'plate', 'manager', 'center', 'Mañana', 'Tarde', 'L-J_(40h)', 'TP-V-D'])
+    hole_counts = pd.DataFrame(columns=[ 'plate', 'manager', 'center', 'manana', 'tarde', 'l_j_40h', 'tp_v_d'])
 
     grouped_holes_df = holes.groupby(['plate', 'manager', 'center'])
     for (plate, manager, center), group in grouped_holes_df:
@@ -158,38 +159,40 @@ def calculate_block_holes(vehicle_shifts):
     
         for _, row in group.iterrows():
             if row['block_0'] == True:
-                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'Mañana'] += 1
-                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'L-J_(40h)'] += 1
-                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'TP-V-D'] += 1
+                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'manana'] += 1
+                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'l_j_40h'] += 1
+                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'tp_v_d'] += 1
             elif row['block_1'] == True:
                 pass
             elif row['block_2'] == True:
-                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'Mañana'] += 1
+                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'manana'] += 1
             elif row['block_3'] == True:
-                if row['Mañana'] == 0 and row['TP-L-V'] == 0:
-                    hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'Mañana'] += 1
-                if row['L-J'] == 0 and row['L-J_(40h)'] == 0:
-                    hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'L-J_(40h)'] += 1
-                if row['TP-V-D'] == 0:
-                    hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'TP-V-D'] += 1
+                if row['manana'] == 0 and row['tp_l_v'] == 0:
+                    hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'manana'] += 1
+                if row['l_j'] == 0 and row['l_j_40h'] == 0:
+                    hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'l_j_40h'] += 1
+                if row['tp_v_d'] == 0:
+                    hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'tp_v_d'] += 1
 
     total_by_manager_df = hole_counts.groupby(['manager', 'center']).sum().reset_index()
-    total_by_manager_df['total'] = total_by_manager_df[['Mañana', 'Tarde', 'L-J_(40h)', 'TP-V-D']].sum(axis=1)
+    total_by_manager_df['total'] = total_by_manager_df[['manana', 'tarde', 'l_j_40h', 'tp_v_d']].sum(axis=1)
     total_by_manager_df.drop(columns=['plate'], inplace=True)
 
     consolidated_total_df = pd.DataFrame({
-    'manager': ['Total'],
+    'manager': ['total'],
     'center': [''],
-    'Mañana': [total_by_manager_df['Mañana'].sum()],
-    'Tarde': [total_by_manager_df['Tarde'].sum()],
-    'L-J_(40h)': [total_by_manager_df['L-J_(40h)'].sum()],
-    'TP-V-D': [total_by_manager_df['TP-V-D'].sum()],
+    'manana': [total_by_manager_df['manana'].sum()],
+    'tarde': [total_by_manager_df['tarde'].sum()],
+    'l_j_40h': [total_by_manager_df['l_j_40h'].sum()],
+    'tp_v_d': [total_by_manager_df['tp_v_d'].sum()],
     'total': [total_by_manager_df['total'].sum()]
     })
 
     total_by_manager_df = pd.concat([total_by_manager_df, consolidated_total_df], ignore_index=True)
 
     return total_by_manager_df
+
+
 
 
 
