@@ -118,79 +118,77 @@ def sanity_check(expected_count, actual_count):
     return None
 
 def calculate_block_holes(vehicle_shifts):
-    # Define blocks
-    vehicle_shifts['block_0'] = (vehicle_shifts[['manana', 'tarde', 'turno_completo', 'tp_v_d', 'tp_l_v', 'l_j', 'l_j_40h']].sum(axis=1) == 0)
-    vehicle_shifts['block_1'] = (vehicle_shifts['turno_completo'] == 1)
-    vehicle_shifts['block_2'] = (vehicle_shifts['tarde'] == 1)
-    vehicle_shifts['block_3'] = ((vehicle_shifts['l_j'] + vehicle_shifts['l_j_40h'] + vehicle_shifts['manana'] + vehicle_shifts['tp_l_v'] + vehicle_shifts['tp_v_d']) >= 1) & (vehicle_shifts['tarde'] == 0) & (vehicle_shifts['turno_completo'] == 0)
+    block_holes = []
+    for date, group in vehicle_shifts.groupby('date'):
+        # Define blocks for the current group/date only
+        group['block_0'] = (group[['manana', 'tarde', 'turno_completo', 'tp_v_d', 'tp_l_v', 'l_j', 'l_j_40h']].sum(axis=1) == 0)
+        group['block_1'] = (group['turno_completo'] == 1)
+        group['block_2'] = (group['tarde'] == 1)
+        group['block_3'] = ((group['l_j'] + group['l_j_40h'] + group['manana'] + group['tp_l_v'] + group['tp_v_d']) >= 1) & (group['tarde'] == 0) & (group['turno_completo'] == 0)
 
-    ## Define holes in each block ##
-    # Block 0: All vehicles in block_0 are holes
-    vehicle_shifts['hole_block_0'] = vehicle_shifts['block_0']
+        # Define holes in each block for the current group/date
+        group['hole_block_0'] = group['block_0']
+        group['hole_block_1'] = False
+        group['hole_block_2'] = (
+            (group['block_2'] == 1) &
+            (group['manana'] == 0) &
+            (group['number_of_drivers'] < 2))
+        group['hole_block_3'] = (
+            (group['block_3'] == 1) &
+            (group['number_of_drivers'] < 3))
 
-    # Block 1: No holes in block_1
-    vehicle_shifts['hole_block_1'] = False
+        # Combine the holes from all blocks for the current group/date
+        group['hole'] = (
+            group['hole_block_0'] |
+            group['hole_block_1'] |
+            group['hole_block_2'] |
+            group['hole_block_3'])
 
-    # Block 2: Holes in block_2 if number_of_drivers < 2 and not in 'Mañana'
-    vehicle_shifts['hole_block_2'] = (
-        (vehicle_shifts['block_2'] == 1) &
-        (vehicle_shifts['manana'] == 0) &
-        (vehicle_shifts['number_of_drivers'] < 2))
+        # Init hole counts for the current group/date
+        holes = group[group['hole'] == True]
+        hole_counts = pd.DataFrame(columns=['plate', 'manager', 'center', 'manana', 'tarde', 'l_j_40h', 'tp_v_d'])
 
-    # Block 3: Holes in block_3 if number_of_drivers < 3
-    vehicle_shifts['hole_block_3'] = (
-        (vehicle_shifts['block_3'] == 1) &
-        (vehicle_shifts['number_of_drivers'] < 3))
-
-    # Combine the holes from all blocks
-    vehicle_shifts['hole'] = (
-        vehicle_shifts['hole_block_0'] |
-        vehicle_shifts['hole_block_1'] |
-        vehicle_shifts['hole_block_2'] |
-        vehicle_shifts['hole_block_3'])
-    
-    # Init hole counts
-    holes = vehicle_shifts[vehicle_shifts['hole'] == True]
-    hole_counts = pd.DataFrame(columns=[ 'plate', 'manager', 'center', 'manana', 'tarde', 'l_j_40h', 'tp_v_d'])
-
-    grouped_holes_df = holes.groupby(['plate', 'manager', 'center'])
-    for (plate, manager, center), group in grouped_holes_df:
-        hole_counts.loc[len(hole_counts)] = [plate, manager, center, 0, 0, 0, 0]
-    
-        for _, row in group.iterrows():
-            if row['block_0'] == True:
-                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'manana'] += 1
-                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'l_j_40h'] += 1
-                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'tp_v_d'] += 1
-            elif row['block_1'] == True:
-                pass
-            elif row['block_2'] == True:
-                hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'manana'] += 1
-            elif row['block_3'] == True:
-                if row['manana'] == 0 and row['tp_l_v'] == 0:
+        grouped_holes_df = holes.groupby(['plate', 'manager', 'center'])
+        for (plate, manager, center), subgroup in grouped_holes_df:
+            hole_counts.loc[len(hole_counts)] = [plate, manager, center, 0, 0, 0, 0]
+        
+            for _, row in subgroup.iterrows():
+                if row['block_0'] == True:
                     hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'manana'] += 1
-                if row['l_j'] == 0 and row['l_j_40h'] == 0:
                     hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'l_j_40h'] += 1
-                if row['tp_v_d'] == 0:
                     hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'tp_v_d'] += 1
+                elif row['block_1'] == True:
+                    pass
+                elif row['block_2'] == True:
+                    hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'manana'] += 1
+                elif row['block_3'] == True:
+                    if row['manana'] == 0 and row['tp_l_v'] == 0:
+                        hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'manana'] += 1
+                    if row['l_j'] == 0 and row['l_j_40h'] == 0:
+                        hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'l_j_40h'] += 1
+                    if row['tp_v_d'] == 0:
+                        hole_counts.loc[(hole_counts['plate'] == plate) & (hole_counts['center'] == center) & (hole_counts['manager'] == manager), 'tp_v_d'] += 1
 
-    total_by_manager_df = hole_counts.groupby(['manager', 'center']).sum().reset_index()
-    total_by_manager_df['total'] = total_by_manager_df[['manana', 'tarde', 'l_j_40h', 'tp_v_d']].sum(axis=1)
-    total_by_manager_df.drop(columns=['plate'], inplace=True)
+        total_by_manager_df = hole_counts.groupby(['manager', 'center']).sum().reset_index()
+        total_by_manager_df['total'] = total_by_manager_df[['manana', 'tarde', 'l_j_40h', 'tp_v_d']].sum(axis=1)
+        total_by_manager_df.drop(columns=['plate'], inplace=True)
 
-    consolidated_total_df = pd.DataFrame({
-    'manager': ['total'],
-    'center': [''],
-    'manana': [total_by_manager_df['manana'].sum()],
-    'tarde': [total_by_manager_df['tarde'].sum()],
-    'l_j_40h': [total_by_manager_df['l_j_40h'].sum()],
-    'tp_v_d': [total_by_manager_df['tp_v_d'].sum()],
-    'total': [total_by_manager_df['total'].sum()]
-    })
+        consolidated_total_df = pd.DataFrame({
+            'manager': ['total'],
+            'center': [''],
+            'manana': [total_by_manager_df['manana'].sum()],
+            'tarde': [total_by_manager_df['tarde'].sum()],
+            'l_j_40h': [total_by_manager_df['l_j_40h'].sum()],
+            'tp_v_d': [total_by_manager_df['tp_v_d'].sum()],
+            'total': [total_by_manager_df['total'].sum()]
+        })
 
-    total_by_manager_df = pd.concat([total_by_manager_df, consolidated_total_df], ignore_index=True)
-
-    return total_by_manager_df
+        total_by_manager_df = pd.concat([total_by_manager_df, consolidated_total_df], ignore_index=True)
+        total_by_manager_df['date'] = date
+        block_holes.append(total_by_manager_df)
+    
+    block_holes_df = pd.concat(block_holes, ignore_index=True)
+    return block_holes_df
 
 
 
