@@ -75,7 +75,7 @@ def update_historical_block_holes_container(tab, selected_manager, start_date, e
     block_holes = calculate_block_holes(vehicle_shifts_hist)
     
     if selected_manager == 'all':
-        block_holes = block_holes.drop(columns=['manager', 'center'])
+        block_holes = block_holes.drop(columns=['manager', 'center', 'total'])
         block_holes = block_holes.groupby(['date']).sum().reset_index()
         wide_df = pd.melt(block_holes, id_vars=['date'], var_name='shift', value_name='holes')
         pivot_df = wide_df.pivot(index='shift', columns='date', values='holes').reset_index()

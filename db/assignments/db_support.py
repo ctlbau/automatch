@@ -45,7 +45,7 @@ def fetch_managers():
 
 
 def fetch_vehicle_shifts(from_date=None, to_date=None):
-    engine = connect(localauth_dev)
+    engine = connect(database)
 
     date_condition = ""
     if from_date and to_date:
