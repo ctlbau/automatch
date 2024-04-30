@@ -188,9 +188,4 @@ def calculate_block_holes(vehicle_shifts):
         block_holes.append(total_by_manager_df)
     
     block_holes_df = pd.concat(block_holes, ignore_index=True)
-    return block_holes_df
-
-
-
-
-
+    return block_holes_df 

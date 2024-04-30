@@ -11,9 +11,9 @@ import os
 
 ATOCHA = (-3.690633, 40.406785)
 MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
-CHOSEN_STYLE = MAP_STYLES[0]
+# CHOSEN_STYLE = MAP_STYLES[0]
 MAPBOX_API_KEY = os.getenv("MAPBOX_TOKEN")
-def create_map_container(id, initial_view_coords=ATOCHA, tooltip_info={}):
+def create_map_container(id, initial_view_coords=ATOCHA, tooltip_info={}, map_style=MAP_STYLES[0]):
         return dcc.Loading(
                 id="loading-map", 
                 children=[
@@ -28,7 +28,7 @@ def create_map_container(id, initial_view_coords=ATOCHA, tooltip_info={}):
                                     pitch=0,
                                     ),
                                 layers=[],
-                                map_style=CHOSEN_STYLE,                            
+                                map_style=map_style,                            
                             ).to_json(),
                             mapboxKey=MAPBOX_API_KEY,
                             tooltip=tooltip_info
@@ -192,10 +192,9 @@ def create_navbar_options(count_or_proportion_id):
         ]
     )
 
-def create_date_range_picker(id):
+def create_date_range_picker(id, min_date, max_date):
     today = datetime.today().date()
     seven_days_prior = today - timedelta(days=7)
-    min_date, max_date = fetch_date_range()
     return html.Nav(
         className="navbar navbar-expand-lg mb-2",
         children=[
@@ -221,7 +220,7 @@ def create_date_range_picker(id):
 def create_dropdown(id, options, label='name', value='id', placeholder='Select an option', multi=False, add_all=False, class_name="col-md-4 offset-md-4 col-12"):
     options = [{'label': option[label], 'value': option[value]} for option in options]
     if add_all:
-        options = [{'label': 'All', 'value': 0}] + options
+        options = [{'label': 'All', 'value': 'all'}] + options
     return html.Nav(
         className="navbar navbar-expand-lg mb-2",
         children=[
@@ -267,6 +266,7 @@ def create_modal(modal_id, title_id, content_id, footer_id):
 def create_data_table(id, data, filename, page_size=10, custom_height=None):
     if data.empty:
         return html.Div("No data available")
+    data.columns = data.columns.astype(str)
     data.columns = data.columns.str.replace('_', ' ')
     columnDefs = [{"field": i} for i in data.columns]
     grid = dag.AgGrid(

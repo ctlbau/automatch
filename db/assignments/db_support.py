@@ -43,9 +43,38 @@ def fetch_managers():
     managers_df = managers_df.sort_values(by='name')
     return managers_df
 
+
+def fetch_vehicle_shifts(from_date=None, to_date=None):
+    engine = connect(localauth_dev)
+
+    date_condition = ""
+    if from_date and to_date:
+        date_condition = f"WHERE VSH.date BETWEEN :from_date AND :to_date"
+    elif from_date:
+        date_condition = f"WHERE VSH.date >= :from_date"
+    elif to_date:
+        date_condition = f"WHERE VSH.date <= :to_date"
+
+    query = f"""
+    SELECT
+        VSH.plate, VSH.date, VSH.manager, VSH.center, VSH.number_of_drivers, VSH.manana, VSH.tarde,  VSH.tp_v_d, VSH.tp_l_v, VSH.l_j, VSH.l_j_40h, VSH.turno_completo
+    FROM
+        VehicleShiftsHistorical VSH
+        {date_condition};
+    """
+
+    params = {
+        'from_date': from_date,
+        'to_date': to_date
+    }
+
+    df = pd.read_sql(text(query), engine, params=params)
+    return df
+
+
 def create_vehicle_shifts(exchange_locations=None, gestores=None):
     engine = connect(database)
-    columns = ["plate", "manana", "tarde", "tp_v_d", "tp_l_v", "l_j", "l_j_40h", "turno_completo", "number_of_drivers", "manager", "center", "exchange_location", "driver_ids"]
+    columns = ["plate", "date", "manana", "tarde", "tp_v_d", "tp_l_v", "l_j", "l_j_40h", "turno_completo", "number_of_drivers", "manager", "center", "exchange_location", "driver_ids"]
     
     if gestores is None:
         gestores = ["Alejandro Garcia Coscolla", "Alfonso Pradas Mateos", "Carlos Sanchez-Fuentes Garcia", "Daniel Gonzalo Garcia", "Deogracias Sanchez  Muñoz", "Emilio Barberan Casanova", "Fernando Mario Fernández Pérez", "Francisco Gómez Martín", "Gonzalo Torralba Rodriguez", "Irene Hinojal Berbis", "Javier Mendez Moreno", "Jesus Pablo Diaz Blazquez", "Jose Antonio Lage Barrantes", "Olga Rosas Roman", "Pedro Arribas Dorado"]
@@ -63,6 +92,7 @@ def create_vehicle_shifts(exchange_locations=None, gestores=None):
     query = f"""
         SELECT 
             v.plate,
+            CURDATE() AS date,
             MAX(CASE WHEN s.name = 'Mañana' THEN 1 ELSE 0 END) AS 'manana',
             MAX(CASE WHEN s.name = 'Tarde' THEN 1 ELSE 0 END) AS 'tarde',
             MAX(CASE WHEN s.name = 'Turno Completo' THEN 1 ELSE 0 END) AS 'turno_completo',

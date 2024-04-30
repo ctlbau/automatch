@@ -2,9 +2,7 @@ import os
 import json
 import requests as req
 import pandas as pd
-import geopandas as gpd
-from shapely.geometry import shape
-from shapely.geometry import LineString
+from shapely.geometry import shape, LineString
 import polyline
 import json
 import urllib.parse

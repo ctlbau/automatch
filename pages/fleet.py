@@ -4,7 +4,7 @@ from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
-from db.fleetpulse.db_support import fetch_managers, fetch_statuses, fetch_centers, fetch_vehicles, fetch_plates, select_plate
+from db.fleetpulse.db_support import fetch_managers, fetch_statuses, fetch_centers, fetch_vehicles, fetch_plates, select_plate, fetch_date_range
 from ui.components import *
 from utils.agg_utils import calculate_aggregations, calculate_status_periods, filter_and_format, sanity_check
 from utils.geo_utils import lic_plate2sher_id_map, get_last_coordinates_by_plate, geodecode_coordinates
@@ -12,7 +12,7 @@ import pydeck as pdk
 import pandas as pd
 
 MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
-CHOSEN_STYLE = MAP_STYLES[0]
+CHOSEN_STYLE = MAP_STYLES[2]
 AURO = (-3.587811320499316, 40.39171586339568)
 
 
@@ -43,6 +43,7 @@ def update_plate_map_store(tab):
     Input('tabs', 'value')
 )
 def render_ui(tab):
+    min_date, max_date = fetch_date_range()
     if tab == 'manager-tab':
         center_options = fetch_centers().to_dict('records')
         status_options = fetch_statuses().to_dict('records')
@@ -52,7 +53,7 @@ def render_ui(tab):
             create_company_filter('company-dropdown'),
             create_dropdown('center-dropdown', options=center_options, label='name', value='id', placeholder='Select center', multi=True, add_all=False),
             create_dropdown('status-dropdown', options=status_options, label='status', value='status', placeholder='Select status', multi=True, add_all=False),
-            create_date_range_picker('date-picker-range'),
+            create_date_range_picker('date-picker-range', min_date, max_date),
             create_navbar_options('count-proportion-radio'),
             html.Div(id='manager-view-graph-and-table-container', className="col-md-9 offset-md-2 col-12"),
             create_modal('details-modal-all', 'details-modal-title-all', 'modal-content-all', 'modal-footer-all'),
@@ -65,10 +66,10 @@ def render_ui(tab):
                 dbc.Row([
                     dbc.Col([
                         create_dropdown('plate-dropdown', options=plates_options, label='plate', value='plate', placeholder='Select plate', multi=False, add_all=False),
-                        create_date_range_picker('date-picker-range'),
+                        create_date_range_picker('date-picker-range', min_date, max_date),
                         html.Div(id='alert-placeholder-vehicle'),
                         html.Div(id='vehicle-view-graph-container'),
-                        html.Div(create_map_container('last-location-map', initial_view_coords=AURO, tooltip_info={}), style={'width': '80%', 'position': 'relative', 'marginTop': '10px', 'marginLeft': 'auto', 'marginRight': 'auto'}),
+                        html.Div(create_map_container('last-location-map', initial_view_coords=AURO, tooltip_info={}, map_style=CHOSEN_STYLE), style={'width': '80%', 'position': 'relative', 'marginTop': '10px', 'marginLeft': 'auto', 'marginRight': 'auto'}),
                     ], width={'size': 10, 'offset': 2, 'align': 'center'}),
                 ])
             ], fluid=True)
@@ -157,7 +158,7 @@ def update_managerview_table_and_graph(tab, start_date, end_date, selected_compa
     agg_df = calculate_aggregations(base_df, ['date', 'status'])
     table_page_size = len(selected_statuses) if selected_statuses else len(status_options)
 
-    if selected_manager == 0:
+    if selected_manager == 'all':
         # All managers
         if selected_statuses:
             base_df = base_df[base_df['status'].isin(selected_statuses)]

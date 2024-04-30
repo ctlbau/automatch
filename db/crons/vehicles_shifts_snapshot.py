@@ -26,8 +26,7 @@ else:
 
 def fetch_prepare_and_insert_vehicle_shifts_snapshot():
     shifts = create_vehicle_shifts()
-    
-    shifts['date'] = datetime.today().date()
+    shifts['date'] = pd.to_datetime(shifts['date'])
     shifts['manana'] = shifts['manana'].astype(int)
     shifts['tarde'] = shifts['tarde'].astype(int)
     shifts['l_j_40h'] = shifts['l_j_40h'].astype(int)
@@ -45,12 +44,14 @@ def fetch_prepare_and_insert_vehicle_shifts_snapshot():
     VALUES
         (:date, :plate, :manager, :center, :number_of_drivers, :manana, :tarde, :tp_v_d, :tp_l_v, :l_j, :l_j_40h, :turno_completo)
     ON DUPLICATE KEY UPDATE
+        date = VALUES(date),
+        plate = VALUES(plate),
         manager = VALUES(manager),
         center = VALUES(center),
         number_of_drivers = VALUES(number_of_drivers),
         manana = VALUES(manana),
-        tp_v_d = VALUES(tp_v_d),
         tarde = VALUES(tarde),
+        tp_v_d = VALUES(tp_v_d),
         tp_l_v = VALUES(tp_l_v),
         l_j = VALUES(l_j),
         l_j_40h = VALUES(l_j_40h),
