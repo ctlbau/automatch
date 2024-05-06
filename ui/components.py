@@ -8,6 +8,8 @@ import dash_ag_grid as dag
 import pydeck as pdk
 from dash_deck import DeckGL
 import os
+import numpy as np
+import pandas as pd
 
 ATOCHA = (-3.690633, 40.406785)
 MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
@@ -316,6 +318,45 @@ def create_line_graph(data, values_type):
                   markers=True)
     fig.update_layout(height=400, xaxis_tickangle=-45, yaxis=dict(type='log'))
     fig.update_xaxes(tickformat="%Y-%m-%d")
+    return dcc.Graph(figure=fig)
+
+
+
+def plot_distance_histogram(df):
+    df['distance'] = df['distance'] / 1000
+    # Find the minimum and maximum distance
+    min_distance = df['distance'].min()
+    max_distance = df['distance'].max()
+
+    # Define the bins with the first bin starting from zero
+    num_bins = 50
+    bins = np.linspace(min_distance, max_distance, num_bins + 1)
+
+    # Create a new DataFrame with the required data for the histogram
+    hist_data = df.groupby(pd.cut(df['distance'], bins=bins)).agg(
+        count=('distance', 'count'),
+        driver_ids=('driver_id', lambda x: ', '.join(map(str, x)))
+    ).reset_index()
+
+    # Convert the Interval objects to strings
+    hist_data['distance'] = hist_data['distance'].astype(str)
+
+    # Create the histogram plot with the tooltip
+    fig = px.bar(
+        hist_data,
+        x='distance',
+        y='count',
+        title='Distribution of Distances',
+        hover_data={'driver_ids': True},
+        category_orders={'distance': hist_data['distance']}
+    )
+
+    # Customize the tooltip
+    fig.update_traces(hovertemplate='Distance Range: %{x}<br>Count: %{y}<br>Driver IDs: %{customdata}')
+
+    # Customize the layout
+    fig.update_layout(xaxis_title='Distance Range in Kms', yaxis_title='Count')
+
     return dcc.Graph(figure=fig)
 
 

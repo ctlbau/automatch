@@ -10,7 +10,7 @@ from db.automatch import fetch_drivers, fetch_shifts, fetch_managers, fetch_cent
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
-from ui.components import create_data_table, create_dropdown, create_map_container, create_modal
+from ui.components import create_data_table, create_dropdown, create_map_container, create_modal, plot_distance_histogram
 from datetime import datetime
 import pandas as pd
 
@@ -170,16 +170,17 @@ def render_content(tab):
     Input('exchange-locations-dropdown', 'value'),
     State('exchange-locations-dropdown', 'options'),
 )
-def update_stats_grid(exchange_locations_id, exchange_locations_options):
+def update_stats_grid_and_graph(exchange_locations_id, exchange_locations_options):
     if exchange_locations_id is not None:
         today = datetime.now().strftime("%Y-%m-%d")  
         if exchange_locations_id == 0:  
             # All exchange locations selected
             drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])  
             drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
+            fig = plot_distance_histogram(drivers_gdf_w_paths_and_distances)
             manager_stats = get_manager_stats(drivers_gdf_w_paths_and_distances, "All")
             grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}.csv', page_size=20, custom_height='800px')
-            return [grid], error_df.to_dict('records') if error_df is not None else None
+            return [fig, grid], error_df.to_dict('records') if error_df is not None else None
         else:
             # Specific exchange location selected
             selected_option = next((option for option in exchange_locations_options if option['value'] == exchange_locations_id), None)
@@ -187,9 +188,10 @@ def update_stats_grid(exchange_locations_id, exchange_locations_options):
                 exchange_location = selected_option['label']
                 drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])
                 drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
+                fig = plot_distance_histogram(drivers_gdf_w_paths_and_distances)
                 manager_stats = get_manager_stats(drivers_gdf_w_paths_and_distances, exchange_location)
                 grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}_at_{exchange_location}.csv', page_size=20, custom_height='800px')
-                return [grid], error_df.to_dict('records') if error_df is not None else None
+                return [fig, grid], error_df.to_dict('records') if error_df is not None else None
             else:
                 print("Selected exchange location not found in options.")
                 return dash.no_update, dash.no_update
