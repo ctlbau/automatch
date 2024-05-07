@@ -248,7 +248,10 @@ def create_dropdown(id, options, label='name', value='id', placeholder='Select a
 def create_modal(modal_id, title_id, content_id, footer_id):
     return dbc.Modal(
         [
-            dbc.ModalHeader(dbc.ModalTitle(id=title_id), close_button=True,),
+            dbc.ModalHeader(
+                dbc.ModalTitle(id=title_id), 
+                close_button=True,
+                ),
             dbc.ModalBody(
                 html.Div(id=content_id)
             ),
@@ -259,7 +262,6 @@ def create_modal(modal_id, title_id, content_id, footer_id):
         id=modal_id,
         is_open=False,
         size="xl",
-        # fullscreen=True,
         centered=True,
         scrollable=True,
     )
@@ -323,38 +325,32 @@ def create_line_graph(data, values_type):
 
 
 def plot_distance_histogram(df):
-    df['distance'] = df['distance'] / 1000
-    # Find the minimum and maximum distance
+    df = df.copy()
+    df.dropna(subset=['distance'], inplace=True)
+    
     min_distance = df['distance'].min()
     max_distance = df['distance'].max()
 
-    # Define the bins with the first bin starting from zero
     num_bins = 50
     bins = np.linspace(min_distance, max_distance, num_bins + 1)
 
-    # Create a new DataFrame with the required data for the histogram
     hist_data = df.groupby(pd.cut(df['distance'], bins=bins)).agg(
         count=('distance', 'count'),
-        driver_ids=('driver_id', lambda x: ', '.join(map(str, x)))
+        drivers=('driver', lambda x: ', '.join(map(str, x)))
     ).reset_index()
 
-    # Convert the Interval objects to strings
     hist_data['distance'] = hist_data['distance'].astype(str)
 
-    # Create the histogram plot with the tooltip
     fig = px.bar(
         hist_data,
         x='distance',
         y='count',
         title='Distribution of Distances',
-        hover_data={'driver_ids': True},
+        hover_data={'drivers': True},
         category_orders={'distance': hist_data['distance']}
     )
 
-    # Customize the tooltip
-    fig.update_traces(hovertemplate='Distance Range: %{x}<br>Count: %{y}<br>Driver IDs: %{customdata}')
-
-    # Customize the layout
+    fig.update_traces(hovertemplate='Distance Range: %{x}<br>Count: %{y}<br>Drivers: %{customdata}')
     fig.update_layout(xaxis_title='Distance Range in Kms', yaxis_title='Count')
 
     return dcc.Graph(figure=fig)

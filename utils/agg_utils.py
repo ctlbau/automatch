@@ -18,7 +18,7 @@ def calculate_aggregations(base_df, group_columns):
 
     return proportion_data
 
-def get_manager_stats(df, case='All'):
+def get_manager_distance_stats(df, case='All'):
     total_drivers = df.groupby('manager')['driver_id'].count().reset_index(name='total_drivers')
 
     columns_order = [
@@ -31,10 +31,10 @@ def get_manager_stats(df, case='All'):
             total_drivers=('driver_id', 'count'),
             matched_drivers=('is_matched', 'sum'),
             unmatched_drivers=('is_matched', lambda x: (x == 0).sum()),
-            avg_distance=('distance', lambda x: round(x.mean() / 1000, 2)),
-            median_distance=('distance', lambda x: round(x.median() / 1000, 2)),
-            min_distance=('distance', lambda x: round(x.min() / 1000, 2)),
-            max_distance=('distance', lambda x: round(x.max() / 1000, 2))
+            avg_distance=('distance', lambda x: round(x.mean(), 2)),
+            median_distance=('distance', lambda x: round(x.median(), 2)),
+            min_distance=('distance', lambda x: round(x.min(), 2)),
+            max_distance=('distance', lambda x: round(x.max(), 2))
         ).reset_index()
 
         manager_stats['matched_percentage'] = round(manager_stats['matched_drivers'] / manager_stats['total_drivers'] * 100, 2)
@@ -46,10 +46,10 @@ def get_manager_stats(df, case='All'):
             count=('exchange_location', 'count'),
             matched_drivers=('is_matched', 'sum'),
             unmatched_drivers=('is_matched', lambda x: (x == 0).sum()),
-            avg_distance=('distance', lambda x: round(x.mean() / 1000, 2)),
-            median_distance=('distance', lambda x: round(x.median() / 1000, 2)),
-            min_distance=('distance', lambda x: round(x.min() / 1000, 2)),
-            max_distance=('distance', lambda x: round(x.max() / 1000, 2))
+            avg_distance=('distance', lambda x: round(x.mean(), 2)),
+            median_distance=('distance', lambda x: round(x.median(), 2)),
+            min_distance=('distance', lambda x: round(x.min(), 2)),
+            max_distance=('distance', lambda x: round(x.max(), 2))
         ).reset_index()
 
         manager_stats['matched_percentage'] = round(manager_stats['matched_drivers'] / manager_stats['count'] * 100, 2)

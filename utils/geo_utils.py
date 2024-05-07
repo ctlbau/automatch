@@ -13,6 +13,7 @@ FIVE_MINUTES = 300
 BASE_URL = "http://localhost:8989"
 
 def calculate_driver_distances_and_paths(gdf):
+    gdf = gdf.copy()
     pathurl = f"{BASE_URL}/route"
     
     gdf["distance"] = None
@@ -22,7 +23,6 @@ def calculate_driver_distances_and_paths(gdf):
     
     for index, row in gdf.iterrows():
         if row["is_matched"]:
-            # Extract the driver's coordinates from the geometry column
             driver_coords = row["geometry"]
             driver_lng, driver_lat = driver_coords.x, driver_coords.y        
             matched_driver_id = row["matched_driver_id"]
@@ -39,28 +39,19 @@ def calculate_driver_distances_and_paths(gdf):
                 
                 response = req.get(pathurl, params=params)
                 if response.status_code == 200:
+                    
                     data = response.json()
-                    
-                    # Extract the distance from the response
                     distance = data["paths"][0]["distance"]
-                    
-                    # Extract the encoded path points from the response
                     encoded_points = data["paths"][0]["points"]
-                    
-                    # Decode the encoded path points
                     decoded_points = polyline.decode(encoded_points)
-                    
-                    # Check if the decoded points array has at least two points
                     if len(decoded_points) >= 2:
-                        # Create a LineString geometry from the decoded path points
                         path_geometry = LineString(decoded_points)
                     else:
-                        # Set the path geometry to None if the decoded points array is invalid
                         path_geometry = None
                     
-                    # Store the calculated distance and path in the GeoDataFrame
-                    gdf.at[index, "distance"] = distance
+                    gdf.at[index, "distance"] = distance / 1000
                     gdf.at[index, "path"] = path_geometry
+                
                 else:
                     error_info = {
                         "driver_id": row["driver_id"],

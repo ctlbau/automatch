@@ -5,12 +5,12 @@ from dash_deck import DeckGL
 import pydeck as pdk
 from dash import html, dcc, callback, MATCH
 from utils.geo_utils import geoencode_address, calculate_isochrones, partition_drivers_by_isochrones, extract_coords_from_encompassing_isochrone, check_partitions_intersection, calculate_driver_distances_and_paths
-from utils.agg_utils import get_manager_stats
+from utils.agg_utils import get_manager_distance_stats
 from db.automatch import fetch_drivers, fetch_shifts, fetch_managers, fetch_centers, fetch_provinces, fetch_exchange_locations
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from dash.dependencies import ALL
-from ui.components import create_data_table, create_dropdown, create_map_container, create_modal, plot_distance_histogram
+from ui.components import create_data_table, create_dropdown, create_map_container, create_modal, plot_distance_histogram, create_modal
 from datetime import datetime
 import pandas as pd
 
@@ -129,6 +129,7 @@ stats_layout = html.Div([
         add_all=True,
         class_name="col-md-4 offset-md-4 col-12"
         ),
+    create_modal('manager-stats-modal', 'manager-stats-modal-title', 'manager-stats-modal-body', 'manager-stats-modal-footer'),
     dcc.Loading(
         id="loading-peak-container",
         type="circle",
@@ -144,8 +145,41 @@ stats_layout = html.Div([
     ),
 ])
 
+@callback(
+    Output('manager-stats-modal', 'is_open'),
+    Output('manager-stats-modal-title', 'children'),
+    Output('manager-stats-modal-body', 'children'),
+    Input('manager-stats', 'cellClicked'),
+    State('exchange-locations-dropdown', 'options'),
+    State('exchange-locations-dropdown', 'value')
+)
+def display_manager_details(cell, exchange_locations_options, exchange_locations_id):
+    if cell and cell['colId'] == 'manager':
+        manager = cell['value']
+        drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])
+        drivers_gdf = drivers_gdf[drivers_gdf['manager'] == manager]
+        selected_option = next((option for option in exchange_locations_options if option['value'] == exchange_locations_id), None)
+        if selected_option is not None:
+            exchange_location = selected_option['label']
+            if exchange_location != 'All':
+                drivers_gdf = drivers_gdf[drivers_gdf['exchange_location'] == exchange_location]
+        drivers_gdf_w_paths_and_distances, _ = calculate_driver_distances_and_paths(drivers_gdf)
+        drivers_gdf_w_paths_and_distances = drivers_gdf_w_paths_and_distances.dropna(subset=['distance'])
+        fig = plot_distance_histogram(drivers_gdf_w_paths_and_distances)
+        drivers_gdf_w_paths_and_distances = drivers_gdf_w_paths_and_distances.drop(columns=['geometry', 'path', 'province', 'lat', 'lng', 'driver_id', 'manager'])
+        grid = create_data_table(f'manager-stats-modal-{manager}', drivers_gdf_w_paths_and_distances, f'manager_stats_{manager}.csv', page_size=20)
+        today = datetime.now().strftime("%Y-%m-%d")
+        title = f"{manager} on {today}"
+        
+        if grid is not None and fig is not None:
+            return True, title, [fig, grid]
+        else:
+            return False, dash.no_update, dash.no_update
+    return False, dash.no_update, dash.no_update
+
+
 layout = html.Div([
-    dcc.Tabs(id="tabs", value='iso-tab', children=[
+    dcc.Tabs(id="tabs", value='stats-tab', children=[
         dcc.Tab(label='Isomatch', value='iso-tab'),
         dcc.Tab(label='Matchstats', value='stats-tab'),
     ], className="col-md-3 offset-md-1 col-12"),
@@ -165,7 +199,7 @@ def render_content(tab):
         return None
 
 @callback(
-    Output('stats-grid-container', 'children'),
+    Output('stats-grid-container', 'children'), 
     Output('error-data-store', 'data'),
     Input('exchange-locations-dropdown', 'value'),
     State('exchange-locations-dropdown', 'options'),
@@ -177,8 +211,9 @@ def update_stats_grid_and_graph(exchange_locations_id, exchange_locations_option
             # All exchange locations selected
             drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])  
             drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
+            drivers_gdf_w_paths_and_distances = drivers_gdf_w_paths_and_distances.dropna(subset=['distance'])
             fig = plot_distance_histogram(drivers_gdf_w_paths_and_distances)
-            manager_stats = get_manager_stats(drivers_gdf_w_paths_and_distances, "All")
+            manager_stats = get_manager_distance_stats(drivers_gdf_w_paths_and_distances, "All")
             grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}.csv', page_size=20, custom_height='800px')
             return [fig, grid], error_df.to_dict('records') if error_df is not None else None
         else:
@@ -188,12 +223,12 @@ def update_stats_grid_and_graph(exchange_locations_id, exchange_locations_option
                 exchange_location = selected_option['label']
                 drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])
                 drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
+                drivers_gdf_w_paths_and_distances = drivers_gdf_w_paths_and_distances.dropna(subset=['distance'])
                 fig = plot_distance_histogram(drivers_gdf_w_paths_and_distances)
-                manager_stats = get_manager_stats(drivers_gdf_w_paths_and_distances, exchange_location)
+                manager_stats = get_manager_distance_stats(drivers_gdf_w_paths_and_distances, exchange_location)
                 grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}_at_{exchange_location}.csv', page_size=20, custom_height='800px')
                 return [fig, grid], error_df.to_dict('records') if error_df is not None else None
             else:
-                print("Selected exchange location not found in options.")
                 return dash.no_update, dash.no_update
     return dash.no_update, dash.no_update
 
@@ -206,7 +241,6 @@ def download_manager_stats_csv(n_clicks):
     if n_clicks > 0:
         return True
     return dash.no_update
-
 
 @callback(
     Output("show-error-modal-btn", "style"),
@@ -232,7 +266,6 @@ def update_error_modal(n_clicks, error_data):
             error_table = create_data_table('Error Details', error_df, 'error_details.csv', page_size=10)
             return True, error_table
     return False, []
-
 
 @callback(
     [
@@ -263,7 +296,7 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
 
         if geoencode_result is None:
             # Geoencoding fails, show the alert
-            return dash.no_update, dash.no_update, True  # Open the alert
+            return dash.no_update, dash.no_update, True
         
         if geoencode_result:
             lat, lon = geoencode_result
