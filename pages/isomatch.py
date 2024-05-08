@@ -179,7 +179,7 @@ def display_manager_details(cell, exchange_locations_options, exchange_locations
 
 
 layout = html.Div([
-    dcc.Tabs(id="tabs", value='stats-tab', children=[
+    dcc.Tabs(id="tabs", value='iso-tab', children=[
         dcc.Tab(label='Isomatch', value='iso-tab'),
         dcc.Tab(label='Matchstats', value='stats-tab'),
     ], className="col-md-3 offset-md-1 col-12"),
@@ -295,7 +295,6 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
         geoencode_result = geoencode_address(street, province, postal_code)
 
         if geoencode_result is None:
-            # Geoencoding fails, show the alert
             return dash.no_update, dash.no_update, True
         
         if geoencode_result:
@@ -328,7 +327,6 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
                 drivers_list = [driver for driver in drivers_list if driver['exchange_location'] in exchange_locations]
                 drivers_gdf = drivers_gdf[drivers_gdf['exchange_location'].isin(exchange_locations)]
 
-            # Define icon data
             icon_data = {
                 "url": "https://upload.wikimedia.org/wikipedia/commons/3/3b/Blackicon.png",
                 "width": 100,
@@ -376,7 +374,7 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
 
             partitioned_drivers = partition_drivers_by_isochrones(drivers_gdf, isochrones_geojson)
             # assert check_partitions_intersection(partitioned_drivers), "Partitions are not disjoint!"
-            # Generate data tables for each partition
+            
             data_tables = []
             num_partitions = len(partitioned_drivers)
             for i, partition in enumerate(partitioned_drivers):
