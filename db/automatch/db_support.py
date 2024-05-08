@@ -15,7 +15,7 @@ else:
 
 
 def fetch_exchange_locations():
-    exchange_locations = ['Cambio fuera', 'Parking Reyes Magos', 'Parking Marqués de Urquijo']
+    exchange_locations = ['Campa de Auro', 'Cambio fuera', 'Parking Reyes Magos', 'Parking Marqués de Urquijo']
     engine = connect(database)
     query = text("SELECT id, name FROM ExchangeLocations;")
     exchange_locations_df = pd.read_sql(query, engine)
