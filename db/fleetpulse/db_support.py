@@ -4,7 +4,7 @@ import time
 from datetime import date
 from sqlalchemy import text
 
-from db.db_connect import localauth_dev, localauth_stg, localauth_prod, companies, connect
+from db.db_connect import localauth_dev, localauth_stg, localauth_prod, connect
 
 app_env = os.getenv("APP_ENV", "dev")
 if app_env == 'stg':
@@ -76,6 +76,25 @@ def fetch_statuses():
     statuses_df = pd.read_sql(query, engine)
     return statuses_df
 
+def fetch_companies_ids():
+    engine = connect(database)
+    query = text("""
+            SELECT 
+                company_group AS company, 
+                id as ids
+            FROM 
+                Companies
+            WHERE 
+                company_group IS NOT NULL;
+        """)
+    data_df = pd.read_sql(query, engine)
+    grouped_df = data_df.groupby('company')['ids'].apply(list).reset_index()
+    all_ids = list(set(data_df['ids']))
+    all_row = pd.DataFrame({'company': ['all'], 'ids': [all_ids]})
+    company_ids = pd.concat([grouped_df, all_row], ignore_index=True)
+    
+    return company_ids
+
 def fetch_date_range():
     engine = connect(database)
     query = text("SELECT MIN(date) AS min_date, MAX(date) AS max_date FROM Vehicles;")
@@ -90,9 +109,9 @@ def fetch_plates():
     plates_df = pd.read_sql(query, engine)
     return plates_df
 
-def fetch_vehicles(centers, company=companies["all"], from_date=None, to_date=None):
+def fetch_vehicles(centers, company_ids: list, from_date=None, to_date=None):
     engine = connect(database)
-    company_ids = ', '.join(map(str, companies[company]))
+    
 
     if centers:
         center_ids = ', '.join(map(str, centers))

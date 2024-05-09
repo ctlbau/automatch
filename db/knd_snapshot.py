@@ -21,9 +21,16 @@ else:
 
 def get_entities_state_from_kendra(engine=connect(kndauth)):
     company_ids_query = """
-        SELECT id
-        FROM company
-        WHERE company_group IN ('auro', 'cibeles', 'managed')
+        SELECT
+	        id,
+	        name as company,
+	        company_group
+        FROM
+	        company
+        WHERE
+	        company_group in('auro', 'cibeles', 'managed')
+        AND
+	        company_group IS NOT NULL;
     """
     company_ids_df = pd.read_sql(company_ids_query, engine)
     all_ids = company_ids_df['id'].tolist()

@@ -37,7 +37,8 @@ def upgrade() -> None:
     if 'Companies' not in tables:
         op.create_table('Companies',
                         sa.Column('id', sa.Integer, primary_key=True),
-                        sa.Column('name', sa.String(60), nullable=False))
+                        sa.Column('name', sa.String(60), nullable=False),
+                        sa.Column('company_group', sa.String(20), nullable=False))
 
     if 'Centers' not in tables:
         op.create_table('Centers',

@@ -219,7 +219,7 @@ def create_date_range_picker(id, min_date, max_date):
 
 
 def create_dropdown(id, options, label='name', value='id', placeholder='Select an option', multi=False, add_all=False, class_name="col-md-4 offset-md-4 col-12"):
-    options = [{'label': option[label], 'value': option[value]} for option in options]
+    options = [{'label': option[label], 'value': ','.join(map(str, option[value])) if isinstance(option[value], list) else option[value]} for option in options]
     if add_all:
         options = [{'label': 'All', 'value': 'all'}] + options
     return html.Nav(
@@ -320,6 +320,7 @@ def create_line_graph(data, values_type):
                   markers=True)
     fig.update_layout(height=400, xaxis_tickangle=-45, yaxis=dict(type='log'))
     fig.update_xaxes(tickformat="%Y-%m-%d")
+    fig.update_xaxes(rangeslider_visible=True)
     return dcc.Graph(figure=fig)
 
 
@@ -354,58 +355,3 @@ def plot_distance_histogram(df):
     fig.update_layout(xaxis_title='Distance Range in Kms', yaxis_title='Count')
 
     return dcc.Graph(figure=fig)
-
-
-def create_arc_layer(drivers_gdf):
-    arc_data = []
-    for _, row in drivers_gdf[drivers_gdf['is_matched'] == True].iterrows():
-        driver_coords = row['geometry']
-        matched_driver_id = row['matched_driver_id']
-        if pd.notna(matched_driver_id):
-            matched_driver = drivers_gdf[drivers_gdf['driver_id'] == matched_driver_id]
-            if not matched_driver.empty:
-                matched_driver_coords = matched_driver['geometry'].values[0]
-                arc_data.append({
-                    'from': [driver_coords.x, driver_coords.y],
-                    'to': [matched_driver_coords.x, matched_driver_coords.y],
-                    'driver_id': row['driver_id'],
-                    'matched_driver_id': matched_driver_id
-                })
-
-    arc_layer = pdk.Layer(
-        "ArcLayer",
-        data=arc_data,
-        get_source_position="from",
-        get_target_position="to",
-        get_width=2,
-        get_tilt=15,
-        get_source_color=[64, 255, 0],
-        get_target_color=[0, 128, 200],
-        pickable=True,
-        auto_highlight=True
-    )
-
-    return pdk.Deck(layers=[arc_layer]).to_json()
-
-
-def create_path_layer(drivers_gdf):
-    path_data = []
-    for _, row in drivers_gdf[drivers_gdf['is_matched'] == True].iterrows():
-        if pd.notna(row['path']):
-            path_data.append({
-                'path': [[lon, lat] for lon, lat in row['path'].coords],
-                'driver_id': row['driver_id'],
-                'matched_driver_id': row['matched_driver_id']
-            })
-    
-    path_df = pd.DataFrame(path_data)
-    path_layer = pdk.Layer(
-        "PathLayer",
-        data=path_df,
-        get_path="path",
-        get_width=5,
-        get_color=[64, 255, 0],
-        pickable=True,
-    )
-
-    return pdk.Deck(layers=[path_layer]).to_json()  
