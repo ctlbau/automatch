@@ -146,6 +146,40 @@ stats_layout = html.Div([
 ])
 
 @callback(
+    Output('stats-grid-container', 'children'), 
+    Output('error-data-store', 'data'),
+    Input('exchange-locations-dropdown', 'value'),
+    State('exchange-locations-dropdown', 'options'),
+)
+def update_stats_grid_and_graph(exchange_locations_id, exchange_locations_options):
+    if exchange_locations_id is not None:
+        today = datetime.now().strftime("%Y-%m-%d")  
+        if exchange_locations_id == 0:  
+            # All exchange locations selected
+            drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])  
+            drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
+            drivers_gdf_w_paths_and_distances = drivers_gdf_w_paths_and_distances.dropna(subset=['distance'])
+            fig = plot_distance_histogram(drivers_gdf_w_paths_and_distances)
+            manager_stats = get_manager_distance_stats(drivers_gdf_w_paths_and_distances, "All")
+            grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}.csv', page_size=20, custom_height='800px')
+            return [fig, grid], error_df.to_dict('records') if error_df is not None else None
+        else:
+            # Specific exchange location selected
+            selected_option = next((option for option in exchange_locations_options if option['value'] == exchange_locations_id), None)
+            if selected_option:
+                exchange_location = selected_option['label']
+                drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])
+                drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
+                drivers_gdf_w_paths_and_distances = drivers_gdf_w_paths_and_distances.dropna(subset=['distance'])
+                fig = plot_distance_histogram(drivers_gdf_w_paths_and_distances)
+                manager_stats = get_manager_distance_stats(drivers_gdf_w_paths_and_distances, exchange_location)
+                grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}_at_{exchange_location}.csv', page_size=20, custom_height='800px')
+                return [fig, grid], error_df.to_dict('records') if error_df is not None else None
+            else:
+                return dash.no_update, dash.no_update
+    return dash.no_update, dash.no_update
+
+@callback(
     Output('manager-stats-modal', 'is_open'),
     Output('manager-stats-modal-title', 'children'),
     Output('manager-stats-modal-body', 'children'),
@@ -183,7 +217,7 @@ layout = html.Div([
         dcc.Tab(label='Isomatch', value='iso-tab'),
         dcc.Tab(label='Matchstats', value='stats-tab'),
     ], className="col-md-3 offset-md-1 col-12"),
-    html.Div(id='isomatch-tabs-content'),
+    html.Div(id='isomatch-tabs-content')
 ])
 
 @callback(
@@ -198,39 +232,6 @@ def render_content(tab):
     else:
         return None
 
-@callback(
-    Output('stats-grid-container', 'children'), 
-    Output('error-data-store', 'data'),
-    Input('exchange-locations-dropdown', 'value'),
-    State('exchange-locations-dropdown', 'options'),
-)
-def update_stats_grid_and_graph(exchange_locations_id, exchange_locations_options):
-    if exchange_locations_id is not None:
-        today = datetime.now().strftime("%Y-%m-%d")  
-        if exchange_locations_id == 0:  
-            # All exchange locations selected
-            drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])  
-            drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
-            drivers_gdf_w_paths_and_distances = drivers_gdf_w_paths_and_distances.dropna(subset=['distance'])
-            fig = plot_distance_histogram(drivers_gdf_w_paths_and_distances)
-            manager_stats = get_manager_distance_stats(drivers_gdf_w_paths_and_distances, "All")
-            grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}.csv', page_size=20, custom_height='800px')
-            return [fig, grid], error_df.to_dict('records') if error_df is not None else None
-        else:
-            # Specific exchange location selected
-            selected_option = next((option for option in exchange_locations_options if option['value'] == exchange_locations_id), None)
-            if selected_option:
-                exchange_location = selected_option['label']
-                drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])
-                drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
-                drivers_gdf_w_paths_and_distances = drivers_gdf_w_paths_and_distances.dropna(subset=['distance'])
-                fig = plot_distance_histogram(drivers_gdf_w_paths_and_distances)
-                manager_stats = get_manager_distance_stats(drivers_gdf_w_paths_and_distances, exchange_location)
-                grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}_at_{exchange_location}.csv', page_size=20, custom_height='800px')
-                return [fig, grid], error_df.to_dict('records') if error_df is not None else None
-            else:
-                return dash.no_update, dash.no_update
-    return dash.no_update, dash.no_update
 
 @callback(
         Output('manager-stats', 'exportDataAsCsv'),

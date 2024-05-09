@@ -4,7 +4,7 @@ from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
-from db.fleetpulse.db_support import fetch_managers, fetch_statuses, fetch_centers, fetch_vehicles, fetch_plates, select_plate, fetch_date_range
+from db.fleetpulse.db_support import fetch_managers, fetch_statuses, fetch_centers, fetch_vehicles, fetch_plates, select_plate, fetch_date_range, fetch_companies_ids
 from ui.components import *
 from utils.agg_utils import calculate_aggregations, calculate_status_periods, filter_and_format, sanity_check
 from utils.geo_utils import lic_plate2sher_id_map, get_last_coordinates_by_plate, geodecode_coordinates
@@ -48,9 +48,10 @@ def render_ui(tab):
         center_options = fetch_centers().to_dict('records')
         status_options = fetch_statuses().to_dict('records')
         manager_options = fetch_managers().to_dict('records')
+        company_options = fetch_companies_ids().to_dict('records')
         return [
             create_dropdown('manager-dropdown', options=manager_options, label='name', value='name', placeholder='Select manager', multi=False, add_all=True),
-            create_company_filter('company-dropdown'),
+            create_dropdown('company-dropdown', options=company_options, label='company', value='ids', placeholder='Select company', multi=False, add_all=False),
             create_dropdown('center-dropdown', options=center_options, label='name', value='id', placeholder='Select center', multi=True, add_all=False),
             create_dropdown('status-dropdown', options=status_options, label='status', value='status', placeholder='Select status', multi=True, add_all=False),
             create_date_range_picker('date-picker-range', min_date, max_date),
@@ -74,6 +75,74 @@ def render_ui(tab):
                 ])
             ], fluid=True)
         ]
+
+@callback(
+    Output('manager-view-graph-and-table-container', 'children'),
+    [
+        Input('tabs', 'value'),
+        Input('date-picker-range', 'start_date'),
+        Input('date-picker-range', 'end_date'),
+        Input('company-dropdown', 'value'),
+        Input('center-dropdown', 'value'),
+        Input('manager-dropdown', 'value'),
+        Input('status-dropdown', 'value'),
+        Input('count-proportion-radio', 'value'),
+    ],
+    State('status-dropdown', 'options')
+)
+def update_managerview_table_and_graph(tab, start_date, end_date, company_ids, selected_centers, selected_manager, selected_statuses, count_proportion_radio, status_options):
+    if tab != 'manager-tab':
+        return dash.no_update
+    if company_ids == [] or company_ids is None:
+        return dash.no_update
+
+    base_df = fetch_vehicles(selected_centers, company_ids=company_ids, from_date=start_date, to_date=end_date)
+    agg_df = calculate_aggregations(base_df, ['date', 'status'])
+    table_page_size = len(selected_statuses) if selected_statuses else len(status_options)
+
+    if selected_manager == 'all':
+        # All managers
+        if selected_statuses:
+            base_df = base_df[base_df['status'].isin(selected_statuses)]
+            agg_df = agg_df[agg_df['status'].isin(selected_statuses)]
+
+        pivot_df = agg_df.pivot(index='status', columns='date', values=count_proportion_radio).reset_index().fillna(0)
+        total_unique_per_status = agg_df[['status', 'total_unique']].drop_duplicates()
+        pivot_df = pivot_df.merge(total_unique_per_status, on='status', how='left')
+        pivot_df.columns = pivot_df.columns.astype(str)
+        pivot_columns = pivot_df.columns[1:]
+        for col in pivot_columns:
+            pivot_df[col] = pivot_df[col].apply(lambda x: round(x, 3))
+        csv_filename = 'all_managers_from_' + start_date + '_to_' + end_date + '.csv'
+        table = create_data_table('main-table-all', pivot_df, csv_filename, table_page_size)
+        download_button = html.Button('Download CSV', id='download-main-table-all-csv', n_clicks=0)
+        fig = create_line_graph(agg_df, count_proportion_radio)
+
+        return [fig, table, download_button]
+
+    else:
+
+        if selected_manager:
+            base_df = base_df[base_df['manager'] == selected_manager]
+        else:
+            return dash.no_update
+
+        if selected_statuses:
+            base_df = base_df[base_df['status'].isin(selected_statuses)]
+        manager_agg_df = calculate_aggregations(base_df, ['date', 'status'])
+        manager_pivot_df = manager_agg_df.pivot(index='status', columns='date', values=count_proportion_radio).reset_index().fillna(0)
+        total_unique_per_status = manager_agg_df[['status', 'total_unique']].drop_duplicates()
+        manager_pivot_df = manager_pivot_df.merge(total_unique_per_status, on='status', how='left')
+        manager_pivot_df.columns = manager_pivot_df.columns.astype(str)
+
+        csv_filename = selected_manager + '_from_' + start_date + '_to_' + end_date + '.csv'
+        table = create_data_table('main-table-part', manager_pivot_df, csv_filename, table_page_size)
+        download_button = html.Button('Download CSV', id='download-main-table-part-csv', n_clicks=0)
+        fig = create_line_graph(manager_agg_df, count_proportion_radio)
+
+        return [fig, table, download_button]
+
+
 
 
 @callback(
@@ -136,69 +205,6 @@ def update_map(selected_plate, plate_map):
     ).to_json()
     return deck_data, None
 
-@callback(
-    Output('manager-view-graph-and-table-container', 'children'),
-    [
-        Input('tabs', 'value'),
-        Input('date-picker-range', 'start_date'),
-        Input('date-picker-range', 'end_date'),
-        Input('company-dropdown', 'value'),
-        Input('center-dropdown', 'value'),
-        Input('manager-dropdown', 'value'),
-        Input('status-dropdown', 'value'),
-        Input('count-proportion-radio', 'value'),
-    ],
-    State('status-dropdown', 'options')
-)
-def update_managerview_table_and_graph(tab, start_date, end_date, selected_company, selected_centers, selected_manager, selected_statuses, count_proportion_radio, status_options):
-    if tab != 'manager-tab':
-        return dash.no_update
-
-    base_df = fetch_vehicles(selected_centers, company=selected_company, from_date=start_date, to_date=end_date)
-    agg_df = calculate_aggregations(base_df, ['date', 'status'])
-    table_page_size = len(selected_statuses) if selected_statuses else len(status_options)
-
-    if selected_manager == 'all':
-        # All managers
-        if selected_statuses:
-            base_df = base_df[base_df['status'].isin(selected_statuses)]
-            agg_df = agg_df[agg_df['status'].isin(selected_statuses)]
-
-        pivot_df = agg_df.pivot(index='status', columns='date', values=count_proportion_radio).reset_index().fillna(0)
-        total_unique_per_status = agg_df[['status', 'total_unique']].drop_duplicates()
-        pivot_df = pivot_df.merge(total_unique_per_status, on='status', how='left')
-        pivot_df.columns = pivot_df.columns.astype(str)
-        pivot_columns = pivot_df.columns[1:]
-        for col in pivot_columns:
-            pivot_df[col] = pivot_df[col].apply(lambda x: round(x, 3))
-        csv_filename = 'all_managers_from_' + start_date + '_to_' + end_date + '.csv'
-        table = create_data_table('main-table-all', pivot_df, csv_filename, table_page_size)
-        download_button = html.Button('Download CSV', id='download-main-table-all-csv', n_clicks=0)
-        fig = create_line_graph(agg_df, count_proportion_radio) # There is also an option for a grouped bar graph
-
-        return [fig, table, download_button]
-
-    else:
-
-        if selected_manager:
-            base_df = base_df[base_df['manager'] == selected_manager]
-        else:
-            return dash.no_update
-
-        if selected_statuses:
-            base_df = base_df[base_df['status'].isin(selected_statuses)]
-        manager_agg_df = calculate_aggregations(base_df, ['date', 'status'])
-        manager_pivot_df = manager_agg_df.pivot(index='status', columns='date', values=count_proportion_radio).reset_index().fillna(0)
-        total_unique_per_status = manager_agg_df[['status', 'total_unique']].drop_duplicates()
-        manager_pivot_df = manager_pivot_df.merge(total_unique_per_status, on='status', how='left')
-        manager_pivot_df.columns = manager_pivot_df.columns.astype(str)
-
-        csv_filename = selected_manager + '_from_' + start_date + '_to_' + end_date + '.csv'
-        table = create_data_table('main-table-part', manager_pivot_df, csv_filename, table_page_size)
-        download_button = html.Button('Download CSV', id='download-main-table-part-csv', n_clicks=0)
-        fig = create_line_graph(manager_agg_df, count_proportion_radio)
-
-        return [fig, table, download_button]
     
 @callback(
         Output('main-table-all', 'exportDataAsCsv'),

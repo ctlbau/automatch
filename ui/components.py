@@ -245,6 +245,8 @@ def create_dropdown(id, options, label='name', value='id', placeholder='Select a
 
 
 
+
+
 def create_modal(modal_id, title_id, content_id, footer_id):
     return dbc.Modal(
         [
