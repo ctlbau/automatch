@@ -71,7 +71,7 @@ def get_entities_state_from_kendra(engine=connect(kndauth)):
     """
     manager_df = pd.read_sql(manager_query, engine)
 
-    return vehicle_df, manager_df
+    return company_ids_df, vehicle_df, manager_df
 
 
 exchange_locations = {
@@ -89,13 +89,11 @@ def synchronize_exchange_locations(exchange_locations=exchange_locations):
     local_engine = connect(localauth)
     
     if kendra_engine and local_engine:
-        # Retrieve unique exchange location keys from Kendra
         with kendra_engine.connect() as conn:
             result = conn.execute(text("""
                 SELECT DISTINCT vehicle.location AS exchange_location
                 FROM vehicle
             """))
-            # Ensure result rows are accessed as dictionaries
             kendra_location_keys = {row['exchange_location'] for row in result.mappings() if row['exchange_location'] is not None}
         
         with local_engine.begin() as conn:
@@ -261,20 +259,24 @@ def ensure_companies_exist(df):
     print("Ensuring all companies present in Kendra exist in the local database...")
 
     with engine.connect() as con:
-            transaction = con.begin()
-            try:
-                unique_companies = df[['company_id', 'company']].drop_duplicates()
-                for _, row in unique_companies.iterrows():
-                    check_query = text("SELECT COUNT(*) FROM Companies WHERE id = :company_id")
-                    insert_query = text("INSERT INTO Companies (id, name) VALUES (:company_id, :company)")
-                    result = con.execute(check_query, {'company_id': row['company_id']})
-                    if result.fetchone()[0] == 0:
-                        con.execute(insert_query, {'company_id': row['company_id'], 'company': row['company']})
-                        inserted_companies += 1
-                transaction.commit()
-            except:
-                transaction.rollback()
-                raise
+        transaction = con.begin()
+        try:
+            unique_companies = df[['id', 'company', 'company_group']].drop_duplicates()
+            for _, row in unique_companies.iterrows():
+                check_query = text("SELECT COUNT(*) FROM Companies WHERE id = :id AND name = :company AND company_group = :company_group")
+                insert_query = text("""
+                    INSERT INTO Companies (id, name, company_group) VALUES (:id, :company, :company_group)
+                    ON DUPLICATE KEY UPDATE
+                    name = VALUES(name), company_group = VALUES(company_group);
+                """)
+                result = con.execute(check_query, {'id': row['id'], 'company': row['company'], 'company_group': row['company_group']})
+                if result.fetchone()[0] == 0:
+                    con.execute(insert_query, {'id': row['id'], 'company': row['company'], 'company_group': row['company_group']})
+                    inserted_companies += 1
+            transaction.commit()
+        except:
+            transaction.rollback()
+            raise
     print(f"Number of new company inserts: {inserted_companies}")
 
 
@@ -289,7 +291,11 @@ def ensure_centers_exist(df):
             unique_centers = df[['center_id', 'center']].drop_duplicates()
             for _, row in unique_centers.iterrows():
                 check_query = text("SELECT COUNT(*) FROM Centers WHERE id = :center_id")
-                insert_query = text("INSERT INTO Centers (id, name) VALUES (:center_id, :center)")
+                insert_query = text("""
+                    INSERT INTO Centers (id, name) VALUES (:center_id, :center)
+                    ON DUPLICATE KEY UPDATE
+                    name = VALUES(name);
+                """)
                 result = con.execute(check_query, {'center_id': row['center_id']})
                 if result.fetchone()[0] == 0:
                     con.execute(insert_query, {'center_id': row['center_id'], 'center': row['center']})
@@ -338,7 +344,7 @@ def delete_absent_managers():
 
             if vehicles_count == 0 and drivers_count == 0:
                 # If no dependencies are found in either table, it's safe to delete the manager
-                con_local.execute(text("DELETE FROM Managers WHERE id = :manager_id", {'manager_id': manager_id}))
+                con_local.execute(text("DELETE FROM Managers WHERE id = :manager_id"), {'manager_id': manager_id})
                 purged_managers_count += 1
             else:
                 # Dependencies exist, so we skip deleting this manager
@@ -549,16 +555,16 @@ def fetch_and_insert_drivers(kndauth, localauth, manager_df):
 
 
 if __name__ == "__main__":
-    df, manager_df = get_entities_state_from_kendra()
+    company_ids_df, vehicle_df, manager_df = get_entities_state_from_kendra()
     delete_absent_managers()
     ensure_managers_exist(manager_df)
-    ensure_companies_exist(df)
-    ensure_centers_exist(df)
-    insert_vehicle_data(df)
+    ensure_companies_exist(company_ids_df)
+    ensure_centers_exist(vehicle_df)
+    insert_vehicle_data(vehicle_df)
     delete_absent_drivers()
     fetch_and_insert_shift_data(kndauth, localauth)
     fetch_and_insert_provinces(kndauth, localauth)
     fetch_and_insert_drivers(kndauth, localauth, manager_df)
-    synchronize_exchange_locations()
+    synchronize_exchange_locations(exchange_locations)
     sync_driver_vehicle_relationships(kndauth, localauth)
     fetch_and_insert_drivers(kndauth, localauth, manager_df)
