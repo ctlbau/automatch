@@ -12,21 +12,21 @@ else:
     database = localauth_prod
 
 
-def fetch_driver_count_per_exchange_location_and_shift():
+def fetch_drivers_exchange_location_and_shift():
     engine = connect(database)
     query = """
     SELECT 
+        d.name,
         e.name AS exchange_location,
-        s.name AS shift,
-        COUNT(*) AS count
+        s.name AS shift
     FROM 
         DriversVehiclesExchangeLocations dve
         JOIN Drivers d ON dve.driver_id = d.kendra_id
         JOIN ExchangeLocations e ON dve.exchange_location_id = e.id
         JOIN Shifts s ON d.shift_id = s.id
     GROUP BY 
-        e.name, s.name;
+        d.name, e.name, s.name;
     """
-    driver_count_per_exchange_location_and_shift_df = pd.read_sql(query, engine)
-    return driver_count_per_exchange_location_and_shift_df
+    drivers_exchange_location_and_shift_df = pd.read_sql(query, engine)
+    return drivers_exchange_location_and_shift_df
 

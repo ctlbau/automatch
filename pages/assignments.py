@@ -14,8 +14,6 @@ dash.register_page(__name__, path='/assignments')
 import warnings
 warnings.filterwarnings("ignore", message="Mean of empty slice")
 
-import pandas as pd
-
 layout = html.Div([
     dcc.Tabs(id='tabs', value='historical', children=[
         dcc.Tab(label='Historical', value='historical'),
