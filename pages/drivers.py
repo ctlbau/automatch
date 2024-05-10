@@ -6,6 +6,7 @@ import pandas as pd
 from db.drivers import fetch_driver_count_per_exchange_location_and_shift
 from ui.components import create_data_table
 from datetime import datetime
+import plotly.express as px
 
 dash.register_page(__name__, path='/drivers')
 
@@ -32,6 +33,14 @@ def create_data_table_on_page_load(pathname):
             values='count'
             )
         driver_count_data_pivot.fillna(0, inplace=True)
+        melted_df = driver_count_data_pivot.reset_index().melt(id_vars='exchange_location', var_name='shift', value_name='count')
+        fig = px.bar(melted_df, x='exchange_location', y='count', color='shift', title='Driver Count per Exchange Location and Shift')
+        fig.update_layout(
+            xaxis_title='Exchange Location',
+            yaxis_title='Count',
+            legend_title='Shift',
+            barmode='stack'
+        )
         driver_count_data_pivot.loc[:, 'Total'] = driver_count_data_pivot.sum(axis=1)
         driver_count_data_pivot.loc['Total', :] = driver_count_data_pivot.sum(axis=0)
         driver_count_data_pivot.reset_index(inplace=True)
@@ -40,7 +49,7 @@ def create_data_table_on_page_load(pathname):
                                  driver_count_data_pivot, 
                                  f"driver-count-per-exchange-location-and-shift-on-{today}.csv",
                                  page_size=10)
-        return [grid]
+        return [dcc.Graph(figure=fig), grid]
     else:
         return None
     
