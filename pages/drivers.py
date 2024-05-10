@@ -30,8 +30,11 @@ def create_data_table_on_page_load(pathname):
             index='exchange_location',
             columns='shift',
             values='count'
-            ).reset_index()
+            )
         driver_count_data_pivot.fillna(0, inplace=True)
+        driver_count_data_pivot.loc[:, 'Total'] = driver_count_data_pivot.sum(axis=1)
+        driver_count_data_pivot.loc['Total', :] = driver_count_data_pivot.sum(axis=0)
+        driver_count_data_pivot.reset_index(inplace=True)
         today = datetime.today().strftime('%Y-%m-%d')
         grid =  create_data_table("driver-count-per-exchange-location-and-shift-grid", 
                                  driver_count_data_pivot, 
