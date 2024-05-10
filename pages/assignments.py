@@ -106,6 +106,7 @@ def update_historical_block_holes_container(tab, selected_manager, start_date, e
 def update_data_table(tab):
     if tab == 'realtime':
         vehicle_shifts_general = create_vehicle_shifts()
+        vehicle_shifts_general = vehicle_shifts_general[vehicle_shifts_general['manager'] != 'Francisco Gómez Martín']
         
         general_block_holes = calculate_block_holes(vehicle_shifts_general)
         today = datetime.today().strftime('%Y-%m-%d')
