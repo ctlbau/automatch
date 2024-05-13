@@ -16,16 +16,14 @@ def fetch_drivers_exchange_location_and_shift():
     engine = connect(database)
     query = """
     SELECT 
-        d.name,
+        d.name AS name,
         e.name AS exchange_location,
         s.name AS shift
     FROM 
-        DriversVehiclesExchangeLocations dve
-        JOIN Drivers d ON dve.driver_id = d.kendra_id
+        Drivers d
+        LEFT JOIN DriversVehiclesExchangeLocations dve ON d.kendra_id = dve.driver_id
         LEFT JOIN ExchangeLocations e ON dve.exchange_location_id = e.id
-        JOIN Shifts s ON d.shift_id = s.id
-    GROUP BY 
-        d.name, e.name, s.name;
+        LEFT JOIN Shifts s ON d.shift_id = s.id;
     """
     drivers_exchange_location_and_shift_df = pd.read_sql(query, engine)
     return drivers_exchange_location_and_shift_df
