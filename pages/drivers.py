@@ -28,6 +28,7 @@ layout = dbc.Container([
 def create_data_table_on_page_load(pathname):
     if pathname == '/drivers':
         drivers_exchange_location_and_shift = fetch_drivers_exchange_location_and_shift()
+        drivers_exchange_location_and_shift.fillna('Unknown', inplace=True)
         driver_count_data = drivers_exchange_location_and_shift.groupby(['exchange_location', 'shift']).size().reset_index(name='count')
         driver_count_data_pivot = driver_count_data.pivot(
             index='exchange_location',
