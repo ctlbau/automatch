@@ -45,7 +45,6 @@ def create_data_table_on_page_load(pathname):
             yaxis_title='Count',
             legend_title='Shift'
             )
-        # fig.update_xaxes(tickangle=-45)
         
         driver_count_data_pivot.loc[:, 'Total'] = driver_count_data_pivot.sum(axis=1)
         driver_count_data_pivot.loc['Total', :] = driver_count_data_pivot.sum(axis=0)
@@ -70,13 +69,20 @@ def create_data_table_on_page_load(pathname):
     prevent_initial_callback=True
 )
 def open_modal(clicked_cell, clicked_row):
-    if clicked_cell and clicked_cell['colId'] != 'exchange location' and clicked_cell['colId'] != 'Total' and clicked_row[0]['exchange location'] != 'Total' and clicked_cell['value'] > 0:
+    if (clicked_cell and 'colId' in clicked_cell and 'value' in clicked_cell and
+        clicked_row and clicked_row[0] and 'exchange location' in clicked_row[0] and
+        clicked_cell['colId'] != 'exchange location' and clicked_cell['colId'] != 'Total' and
+        clicked_row[0]['exchange location'] != 'Total' and clicked_cell['value'] > 0):
+        
         shift = clicked_cell['colId']
         value = clicked_cell['value']
         exchange_location = clicked_row[0]['exchange location']
         drivers_exchange_location_and_shift = fetch_drivers_exchange_location_and_shift()
-        drivers_exchange_location_and_shift_filtered = drivers_exchange_location_and_shift[drivers_exchange_location_and_shift['exchange_location'] == exchange_location]
-        drivers_exchange_location_and_shift_filtered = drivers_exchange_location_and_shift_filtered[drivers_exchange_location_and_shift_filtered['shift'] == shift]
+        drivers_exchange_location_and_shift['exchange_location'] = drivers_exchange_location_and_shift['exchange_location'].fillna('Unknown')
+        drivers_exchange_location_and_shift_filtered = drivers_exchange_location_and_shift[
+            (drivers_exchange_location_and_shift['exchange_location'] == exchange_location) &
+            (drivers_exchange_location_and_shift['shift'] == shift)
+        ]
         grid = create_data_table("driver-count-disaggregation-grid", drivers_exchange_location_and_shift_filtered, f"driver-count-disaggregation-for-{exchange_location}-{shift}.csv")
         return True, f"Found {value} drivers for {exchange_location} with shift {shift}", grid
     else:

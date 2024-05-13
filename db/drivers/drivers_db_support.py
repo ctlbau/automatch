@@ -22,7 +22,7 @@ def fetch_drivers_exchange_location_and_shift():
     FROM 
         DriversVehiclesExchangeLocations dve
         JOIN Drivers d ON dve.driver_id = d.kendra_id
-        JOIN ExchangeLocations e ON dve.exchange_location_id = e.id
+        LEFT JOIN ExchangeLocations e ON dve.exchange_location_id = e.id
         JOIN Shifts s ON d.shift_id = s.id
     GROUP BY 
         d.name, e.name, s.name;
