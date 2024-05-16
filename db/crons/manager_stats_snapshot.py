@@ -1,14 +1,14 @@
 import os
 import pandas as pd
 import numpy as np
-from ..db_connect import localauth_dev, localauth_stg, localauth_prod, companies, connect
+from ..db_connect import localauth_dev, localauth_stg, localauth_prod, connect
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from db.automatch.db_support import fetch_drivers
 from utils.geo_utils import calculate_driver_distances_and_paths
-from utils.agg_utils import get_manager_stats
+from utils.agg_utils import get_manager_distance_stats
 
 from datetime import datetime
 from dotenv import load_dotenv
@@ -37,16 +37,16 @@ def fetch_prepare_and_insert_manager_stats_snapshot():
     
     drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])  
     drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
-    manager_stats_general = get_manager_stats(drivers_gdf_w_paths_and_distances, "All")
+    manager_stats_general = get_manager_distance_stats(drivers_gdf_w_paths_and_distances, "All")
     manager_stats_general['exchange_location'] = 'General'
     manager_stats_general['date'] = today
-    manager_stats_cambio = get_manager_stats(drivers_gdf_w_paths_and_distances, "Cambio fuera")
+    manager_stats_cambio = get_manager_distance_stats(drivers_gdf_w_paths_and_distances, "Cambio fuera")
     manager_stats_cambio['exchange_location'] = 'Cambio fuera'
     manager_stats_cambio['date'] = today
-    manager_stats_marques = get_manager_stats(drivers_gdf_w_paths_and_distances, "Parking Marqués de Urquijo")
+    manager_stats_marques = get_manager_distance_stats(drivers_gdf_w_paths_and_distances, "Parking Marqués de Urquijo")
     manager_stats_marques['exchange_location'] = 'Parking Marqués de Urquijo'
     manager_stats_marques['date'] = today
-    manager_stats_reyes = get_manager_stats(drivers_gdf_w_paths_and_distances, "Parking Reyes Magos")
+    manager_stats_reyes = get_manager_distance_stats(drivers_gdf_w_paths_and_distances, "Parking Reyes Magos")
     manager_stats_reyes['exchange_location'] = 'Parking Reyes Magos'
     manager_stats_reyes['date'] = today
 

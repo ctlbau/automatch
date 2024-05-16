@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from ..db_connect import localauth_dev, localauth_stg, localauth_prod, companies, connect
+from ..db_connect import localauth_dev, localauth_stg, localauth_prod, connect
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
