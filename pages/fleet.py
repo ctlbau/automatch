@@ -165,19 +165,24 @@ def update_modal_all(clicked_cell, clicked_row, companies, selected_centers, sta
 
     column_selected = clicked_cell['colId']
     status = clicked_row[0]['status']
-    
     base_df = fetch_vehicles(selected_centers, company_ids=companies, from_date=start_date, to_date=end_date)
     if base_df is None or base_df.empty:
         return False, "", [], []
     
     status_df = base_df[base_df['status'] == status].copy()
+    min_date = base_df['date'].min()
+    max_date = base_df['date'].max()
+    days = (max_date - min_date).days + 1
 
     if column_selected == 'total unique':
         streaks_df = calculate_status_periods(status_df)
         status_df = status_df.merge(streaks_df, on='plate', how='left')
-        status_df.drop(['date', 'status', 'date_diff', 'status_change', 'group'], axis=1, inplace=True)
+        status_df.drop(['kendra_id','date', 'status', 'date_diff', 'status_change', 'group'], axis=1, inplace=True)
         status_df.drop_duplicates(subset=['plate'], inplace=True)
-        modal_title = f"Overview of {len(status_df)} vehicles that have been, at some point, in {status} status between {start_date} and {end_date}"
+        modal_title = html.Div([
+                    f"Overview of {len(status_df)} vehicles that have been in {status} status between {start_date} and {end_date}.",
+                    html.Br(),
+                    f"Effective days: {days}"])
         csv_filename = f'{status}_from_{start_date}_to_{end_date}.csv'
         table = create_data_table(f'modal-content-all-total-unique', status_df, csv_filename, 10)
         download_button = html.Button('Download CSV', id='download-modal-table-total-unique-csv', n_clicks=0)
@@ -230,15 +235,22 @@ def update_modal_part(clicked_cell, clicked_row, company_ids, selected_centers, 
         return False, "", [], []
     
     status_df = base_df[base_df['status'] == status].copy()
+    min_date = base_df['date'].min()
+    max_date = base_df['date'].max()
+    days = (max_date - min_date).days + 1
+    
     if selected_manager:
         status_df = status_df[status_df['manager'] == selected_manager]
 
     if column_selected == 'total unique':
         streaks_df = calculate_status_periods(status_df)
         status_df = status_df.merge(streaks_df, on='plate', how='left')
-        status_df.drop(['date','status', 'date_diff', 'status_change', 'group'], axis=1, inplace=True)
+        status_df.drop(['kendra_id','date','status', 'date_diff', 'status_change', 'group'], axis=1, inplace=True)
         status_df.drop_duplicates(subset=['plate'], inplace=True)
-        modal_title = f"Overview of {len(status_df)} vehicles that have been, at some point, in {status} status between {start_date} and {end_date}"
+        modal_title = html.Div([
+                    f"Overview of {len(status_df)} vehicles that have been in {status} status between {start_date} and {end_date} for {selected_manager}.",
+                    html.Br(),
+                    f"Effective days: {days}"])
         csv_filename = f'{status}_between_{start_date}_and_{end_date}_for_{selected_manager}.csv'
         table = create_data_table(f'modal-content-part-total-unique', status_df, csv_filename, 10)
         download_button = html.Button('Download CSV', id='download-modal-table-status-csv', n_clicks=0)

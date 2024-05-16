@@ -11,7 +11,6 @@ elif app_env == 'dev':
 else:
     database = localauth_prod
 
-
 def fetch_date_range():
     engine = connect(database)
     query = text("SELECT MIN(date) AS min_date, MAX(date) AS max_date FROM VehicleShiftsHistorical;")

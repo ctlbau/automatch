@@ -66,7 +66,10 @@ def get_manager_distance_stats(df, case='All'):
 def calculate_status_periods(base_df):
     # Ensure 'date' is in datetime format
     base_df['date'] = pd.to_datetime(base_df['date'])
-
+    # From min and max date and calculate number of days in base_df
+    min_date = base_df['date'].min()
+    max_date = base_df['date'].max()
+    days = (max_date - min_date).days + 1
     # Sort the DataFrame by 'plate' and 'date' to ensure correct order
     base_df.sort_values(by=['plate', 'date'], inplace=True)
 
@@ -80,23 +83,28 @@ def calculate_status_periods(base_df):
     base_df['group'] = base_df.groupby('plate')['status_change'].cumsum()
 
     # Group by 'plate', 'status', and 'group' to calculate the length of each continuous period
-    continuous_periods = base_df.groupby(['plate', 'status', 'group']).size().reset_index(name='length')
+    continuous_periods = base_df.groupby(['plate', 'status', 'group']).size().reset_index(name='length_cont')
 
     # Find the longest continuous period for each plate
-    longest_continuous_periods = continuous_periods.loc[continuous_periods.groupby(['plate'])['length'].idxmax()]
+    longest_continuous_periods = continuous_periods.loc[continuous_periods.groupby(['plate'])['length_cont'].idxmax()]
 
     # Calculate the total period for each status of a plate, regardless of continuity
-    total_periods = base_df.groupby(['plate', 'status']).size().reset_index(name='total_length')
+    total_periods = base_df.groupby(['plate', 'status']).size().reset_index(name='length_disc')
 
     # Find the status with the longest total period for each plate
-    longest_total_periods = total_periods.loc[total_periods.groupby(['plate'])['total_length'].idxmax()]
+    longest_total_periods = total_periods.loc[total_periods.groupby(['plate'])['length_disc'].idxmax()]
 
     # Merge the longest continuous and total periods into a single DataFrame
     merged_periods = pd.merge(longest_continuous_periods, longest_total_periods, on='plate', suffixes=('_cont', '_total'))
+    merged_periods['percentage_continuous'] = merged_periods['length_disc'] / days * 100
 
     # Select and rename columns
-    merged_periods = merged_periods[['plate', 'status_cont', 'length', 'status_total', 'total_length']]
-    merged_periods.rename(columns={'status_cont': 'longest_continued_status', 'length': 'longest_continued_days', 'status_total': 'greatest_total_status', 'total_length': 'greatest_total_days'}, inplace=True)
+    merged_periods.drop(columns=['group'], inplace=True)
+    merged_periods.rename(columns={
+        'status_cont': 'longest_continued_status',
+        'length_cont': 'longest_continued_days', 
+        'status_total': 'greatest_total_status',
+        'length_disc': 'greatest_total_days'}, inplace=True)
 
     return merged_periods
 
