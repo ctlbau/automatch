@@ -97,6 +97,7 @@ def calculate_status_periods(base_df):
     # Merge the longest continuous and total periods into a single DataFrame
     merged_periods = pd.merge(longest_continuous_periods, longest_total_periods, on='plate', suffixes=('_cont', '_total'))
     merged_periods['percentage_continuous'] = merged_periods['length_disc'] / days * 100
+    merged_periods['percentage_continuous'] = merged_periods['percentage_continuous'].round(2)
 
     # Select and rename columns
     merged_periods.drop(columns=['group'], inplace=True)

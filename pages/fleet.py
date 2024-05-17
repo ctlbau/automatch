@@ -98,7 +98,7 @@ def update_managerview_table_and_graph(tab, start_date, end_date, company_ids, s
 
     base_df = fetch_vehicles(selected_centers, company_ids=company_ids, from_date=start_date, to_date=end_date)
     agg_df = calculate_aggregations(base_df, ['date', 'status'])
-    table_page_size = len(selected_statuses) if selected_statuses else len(status_options)
+    table_page_size = len(selected_statuses) + 1 if selected_statuses else len(status_options) + 1
 
     if selected_manager == 'all':
         # All managers
@@ -109,10 +109,14 @@ def update_managerview_table_and_graph(tab, start_date, end_date, company_ids, s
         pivot_df = agg_df.pivot(index='status', columns='date', values=count_proportion_radio).reset_index().fillna(0)
         total_unique_per_status = agg_df[['status', 'total_unique']].drop_duplicates()
         pivot_df = pivot_df.merge(total_unique_per_status, on='status', how='left')
-        pivot_df.columns = pivot_df.columns.astype(str)
-        pivot_columns = pivot_df.columns[1:]
-        for col in pivot_columns:
-            pivot_df[col] = pivot_df[col].apply(lambda x: round(x, 3))
+        numerical_columns = pivot_df.columns[1:]
+        pivot_df.loc['Total', numerical_columns] = pivot_df[numerical_columns].sum(axis=0)
+        pivot_df.loc['Total', 'status'] = 'Total'
+        pivot_df.reset_index(inplace=True, drop=True)
+        
+        for col in numerical_columns:
+            pivot_df[col] = pivot_df[col].apply(lambda x: round(x, 2))
+        
         csv_filename = 'all_managers_from_' + start_date + '_to_' + end_date + '.csv'
         table = create_data_table('main-table-all', pivot_df, csv_filename, table_page_size)
         download_button = html.Button('Download CSV', id='download-main-table-all-csv', n_clicks=0)
