@@ -111,8 +111,7 @@ def fetch_plates():
 
 def fetch_vehicles(centers, company_ids: list, from_date=None, to_date=None):
     engine = connect(database)
-    
-
+    company_ids = ', '.join(map(str, company_ids))
     if centers:
         center_ids = ', '.join(map(str, centers))
         center_condition = f"AND V.center_id IN ({center_ids})"

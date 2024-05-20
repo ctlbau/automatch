@@ -51,7 +51,7 @@ def render_ui(tab):
         company_options = fetch_companies_ids().to_dict('records')
         return [
             create_dropdown('manager-dropdown', options=manager_options, label='name', value='name', placeholder='Select manager', multi=False, add_all=True),
-            create_dropdown('company-dropdown', options=company_options, label='company', value='ids', placeholder='Select company', multi=False, add_all=False),
+            create_dropdown('company-dropdown', options=company_options, label='company', value='ids', placeholder='Select company', multi=True, add_all=False),
             create_dropdown('center-dropdown', options=center_options, label='name', value='id', placeholder='Select center', multi=True, add_all=False),
             create_dropdown('status-dropdown', options=status_options, label='status', value='status', placeholder='Select status', multi=True, add_all=False),
             create_date_range_picker('date-picker-range', min_date, max_date),
@@ -95,7 +95,7 @@ def update_managerview_table_and_graph(tab, start_date, end_date, company_ids, s
         return dash.no_update
     if company_ids == [] or company_ids is None:
         return dash.no_update
-
+    print('company_ids:', company_ids)
     base_df = fetch_vehicles(selected_centers, company_ids=company_ids, from_date=start_date, to_date=end_date)
     agg_df = calculate_aggregations(base_df, ['date', 'status'])
     table_page_size = len(selected_statuses) + 1 if selected_statuses else len(status_options) + 1
