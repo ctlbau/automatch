@@ -3,8 +3,8 @@ from dash import callback, html, dcc
 from dash.dependencies import Input, Output
 import dash_bootstrap_components as dbc
 import pandas as pd
-from db.drivers import fetch_drivers_exchange_location_and_shift
-from ui.components import create_data_table, create_modal
+from db.drivers import fetch_drivers_exchange_location_and_shift, fetch_provinces
+from ui.components import create_data_table, create_modal, create_dropdown
 from datetime import datetime
 import plotly.express as px
 
@@ -14,6 +14,7 @@ layout = dbc.Container([
     dcc.Location(id='url', refresh=False),
     dbc.Row([
         dbc.Col([
+            create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select Province', multi=True, add_all=True),
             html.Div(id='driver-count-per-exchange-location-and-shift-container', children=[]),
             html.Button('Download CSV', id='download-driver-count-per-exchange-location-and-shift-csv', n_clicks=0),
             create_modal('driver-count-disaggregation-modal', 'driver-count-disaggregation-title', 'driver-count-disaggregation-content', 'driver-count-disaggregation-footer')
@@ -23,11 +24,14 @@ layout = dbc.Container([
 
 @callback(
     Output('driver-count-per-exchange-location-and-shift-container', 'children'),
-    Input('url', 'pathname')
+    Input('province-dropdown', 'value')
 )
-def create_data_table_on_page_load(pathname):
-    if pathname == '/drivers':
-        drivers_exchange_location_and_shift = fetch_drivers_exchange_location_and_shift()
+def create_data_table_on_page_load(province_ids):
+    if province_ids:
+        print(province_ids)
+        if 'all' in province_ids:
+            province_ids = fetch_provinces()['id'].tolist()
+        drivers_exchange_location_and_shift = fetch_drivers_exchange_location_and_shift(province_ids)
         drivers_exchange_location_and_shift['exchange_location'] = drivers_exchange_location_and_shift['exchange_location'].fillna('Unknown')
         driver_count_data = drivers_exchange_location_and_shift.groupby(['exchange_location', 'shift']).size().reset_index(name='count')
         driver_count_data_pivot = driver_count_data.pivot(
