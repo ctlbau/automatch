@@ -28,7 +28,6 @@ layout = dbc.Container([
 )
 def create_data_table_on_page_load(province_ids):
     if province_ids:
-        print(province_ids)
         if 'all' in province_ids:
             province_ids = fetch_provinces()['id'].tolist()
         drivers_exchange_location_and_shift = fetch_drivers_exchange_location_and_shift(province_ids)
