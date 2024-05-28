@@ -32,7 +32,9 @@ elif app_env == 'dev':
 else:
     localauth = localauth_prod
 
-def get_entities_state_from_kendra(engine=connect(kndauth)):
+def get_entities_state_from_kendra():
+    engine = connect(kndauth)
+    
     company_ids_query = """
         SELECT
 	        id,
@@ -45,13 +47,13 @@ def get_entities_state_from_kendra(engine=connect(kndauth)):
         AND
 	        company_group IS NOT NULL;
     """
-    company_ids_df = pd.read_sql(company_ids_query, engine)
-    all_ids = company_ids_df['id'].tolist()
+    companies_df = pd.read_sql(company_ids_query, engine)
+    all_company_ids = companies_df['id'].tolist()
 
-    if not all_ids:
+    if not all_company_ids:
         raise ValueError("No companies found for the specified groups.")
 
-    all_companies = ', '.join(map(str, all_ids))
+    all_companies = ', '.join(map(str, all_company_ids))
 
     vehicle_query = f"""
         SELECT
@@ -115,7 +117,7 @@ def get_entities_state_from_kendra(engine=connect(kndauth)):
     drivers_query = f"""
     SELECT
         e.id as kendra_id,
-        CONCAT(e.first_name, ' ', e.last_name) AS name,
+        CONCAT(COALESCE(e.first_name, ''), ' ', COALESCE(e.last_name, '')) AS name,
         e.address_street AS street,
         e.address_city AS city,
         e.address_country AS country,
@@ -148,19 +150,90 @@ def get_entities_state_from_kendra(engine=connect(kndauth)):
     drivers_df = pd.read_sql(drivers_query, engine)
     drivers_df = drivers_df.replace({np.nan: None})
 
-    return company_ids_df, vehicle_df, manager_df, vehicle_driver_exchange_df, drivers_df
+    shifts_query = """SELECT s.id, s.name FROM shift s ORDER BY s.id;"""
+    shifts_df = pd.read_sql(shifts_query, engine)
+    shifts_df = shifts_df.replace({np.nan: None})
 
-def insert_vehicle_data(df, engine=connect(localauth)):
-    df['date'] = pd.to_datetime(datetime.now().date())
-    df = df.replace({np.nan: None})
+    provinces_query = """SELECT p.id, p.name FROM province p ORDER BY p.id;"""
+    provinces_df = pd.read_sql(provinces_query, engine)
+    provinces_df = provinces_df.replace({np.nan: None})
+
+    return companies_df, vehicle_df, manager_df, vehicle_driver_exchange_df, drivers_df, shifts_df, provinces_df
+
+def delete_absent_drivers(drivers_df):
+    knd_driver_ids = set(drivers_df['kendra_id'].tolist())
+    
+    engine_local = connect(localauth)
+    local_driver_ids_query = "SELECT kendra_id FROM Drivers"
+    with engine_local.connect() as conn_local:
+        result_local = conn_local.execute(text(local_driver_ids_query))
+        local_driver_ids = set([row[0] for row in result_local.fetchall()])
+
+    absent_driver_ids = local_driver_ids - knd_driver_ids
+    console.print(f"Absent Driver IDs: {absent_driver_ids}", style="info")
+
+    deleted_drivers_count = 0
+    delete_driver_query = "DELETE FROM Drivers WHERE kendra_id = :kendra_id"
+    with engine_local.connect() as conn_local:
+        transaction = conn_local.begin()
+        try:
+            for driver_id in absent_driver_ids:
+                conn_local.execute(text(delete_driver_query), {'kendra_id': driver_id})
+                deleted_drivers_count += 1
+            transaction.commit()
+            console.print(f"Transaction committed, {deleted_drivers_count} drivers deleted.", style="success")
+        except Exception as e:
+            transaction.rollback()
+            console.print(f"An error occurred during transaction: {e}", style="error")
+            raise
+
+    verify_query = "SELECT COUNT(*) FROM Drivers WHERE kendra_id = :kendra_id"
+    with engine_local.connect() as conn_local:
+        for driver_id in absent_driver_ids:
+            result_verify = conn_local.execute(text(verify_query), {'kendra_id': driver_id})
+            if result_verify.fetchone()[0] != 0:
+                console.print(f"Failed to delete driver with ID {driver_id}", style="error")
+
+def delete_absent_managers(manager_df):
+    engine_knd = connect(kndauth)
+    knd_manager_ids = set(manager_df['manager_id'].tolist())
+
+    engine_local = connect(localauth)
+    with engine_local.connect() as con_local:
+        result_local = con_local.execute(text("SELECT id FROM Managers"))
+        local_manager_ids = set([row[0] for row in result_local.fetchall()])
+
+        managers_to_delete = local_manager_ids - knd_manager_ids
+        purged_managers_count = 0
+
+        for manager_id in managers_to_delete:
+            # Check for dependencies in the Vehicles table
+            vehicles_count = con_local.execute(text("SELECT COUNT(*) FROM Vehicles WHERE manager_id = :manager_id"), {'manager_id': manager_id}).fetchone()[0]
+
+            # Check for dependencies in the Drivers table
+            drivers_count = con_local.execute(text("SELECT COUNT(*) FROM Drivers WHERE manager_id = :manager_id"), {'manager_id': manager_id}).fetchone()[0]
+
+            if vehicles_count == 0 and drivers_count == 0:
+                # If no dependencies are found in either table, it's safe to delete the manager
+                con_local.execute(text("DELETE FROM Managers WHERE id = :manager_id"), {'manager_id': manager_id})
+                purged_managers_count += 1
+            else:
+                # Dependencies exist, so we skip deleting this manager
+                console.print(f"Skipping deletion of manager {manager_id} due to existing dependencies in Vehicles or Drivers tables.", style="warning")
+
+        console.print(f"Completed checking and deleting absent managers from local database. Total managers purged: {purged_managers_count}.", style="success")
+
+def sync_vehicles(vehicle_df):
+    engine = connect(localauth)
+    
+    vehicle_df['date'] = pd.to_datetime(datetime.now().date())
     new_inserts_count = 0
     updates_count = 0
 
-    # TODO: Improve check for the number of affected rows
-
     with engine.connect() as con:
-        for _, row in df.iterrows():
-            query = text("""
+        for _, row in vehicle_df.iterrows():
+            check_query = text("SELECT COUNT(*) FROM Vehicles WHERE kendra_id = :kendra_id")
+            insert_query = text("""
             INSERT INTO Vehicles (kendra_id, plate, status, date, company_id, center_id, manager_id)
                 VALUES (:kendra_id, :plate, :status, :date, :company_id, :center_id, :manager_id)
                 ON DUPLICATE KEY UPDATE
@@ -175,23 +248,20 @@ def insert_vehicle_data(df, engine=connect(localauth)):
             params['date'] = params['date'].date() if isinstance(params['date'], pd.Timestamp) else params['date']
             
             try:
-                result = con.execute(query, params)
-                # For an insert, this function returns 1.
-                # For an update, this function returns 2 if the row existed and was changed.
-                # If the existing row was matched but not changed (because the new values were the same as the old values), it returns 0.
-            #     affected_rows = result.rowcount
-            #     if affected_rows == 1:
-            #         new_inserts_count += 1
-            #     elif affected_rows == 2:
-            #         updates_count += 1
+                result = con.execute(check_query, {'kendra_id': row['kendra_id']})
+                if result.fetchone()[0] == 0:
+                    con.execute(insert_query, params)
+                    new_inserts_count += 1
+                else:
+                    con.execute(insert_query, params)
+                    updates_count += 1
             except Exception as e:
                 console.print(f"Error executing query: {e}", style="error")
 
         con.commit()
-        # print(f"Inserted {new_inserts_count} new vehicles.")
-        # print(f"Updated {updates_count} existing vehicles.")
-        console.print(f"Total inserted or updated vehicles: {len(df)}", style="success")
-
+        console.print(f"Inserted {new_inserts_count} new vehicles.", style="success")
+        console.print(f"Updated {updates_count} existing vehicles.", style="info")
+        console.print(f"Total inserted or updated vehicles: {len(vehicle_df)}", style="success")
 
 exchange_locations = {
     # keys are the values found in knd
@@ -203,7 +273,7 @@ exchange_locations = {
         'home_full_shift': 'Turno completo en casa'
     }
 
-def synchronize_exchange_locations(exchange_locations=exchange_locations):
+def sync_exchange_locations(exchange_locations=exchange_locations):
 
     kendra_engine = connect(kndauth)
     local_engine = connect(localauth)
@@ -232,13 +302,12 @@ def synchronize_exchange_locations(exchange_locations=exchange_locations):
                     # After inserting, add it to current_locations to avoid trying to insert it again
                     current_locations.add(location_name)
 
-
-def sync_driver_vehicle_relationships(localauth, knd_state_df):
+def sync_driver_vehicle_relationships(vehicle_df):
     engine_local = connect(localauth)
     
     local_query = text("SELECT driver_id, vehicle_id, exchange_location_id FROM DriversVehiclesExchangeLocations")
     
-    knd_triples = set(knd_state_df.itertuples(index=False, name=None))
+    knd_triples = set(vehicle_df.itertuples(index=False, name=None))
     local_triples = set()
     
     with engine_local.connect() as conn_local:
@@ -323,7 +392,7 @@ def get_or_create_exchange_location(conn, location_key):
     
     return location_id
 
-def ensure_managers_exist(manager_df):
+def ensure_managers_exist(managers_df):
     engine = connect(localauth)
     inserted_managers = 0
     console.print("Ensuring all managers present in Kendra exist in the local database...", style="info")
@@ -331,7 +400,7 @@ def ensure_managers_exist(manager_df):
     with engine.connect() as con:
         transaction = con.begin()
         try:
-            for _, row in manager_df.iterrows():
+            for _, row in managers_df.iterrows():
                 check_query = text("SELECT COUNT(*) FROM Managers WHERE id = :manager_id")
                 insert_query = text("INSERT INTO Managers (id, name) VALUES (:manager_id, :manager)")
                 result = con.execute(check_query, {'manager_id': row['manager_id']})
@@ -344,7 +413,7 @@ def ensure_managers_exist(manager_df):
             raise
     console.print(f"Number of new manager inserts: {inserted_managers}", style="success")
 
-def ensure_companies_exist(df):
+def ensure_companies_exist(companies_df):
     engine = connect(localauth)
     inserted_companies = 0
     console.print("Ensuring all companies present in Kendra exist in the local database...", style="info")
@@ -352,7 +421,7 @@ def ensure_companies_exist(df):
     with engine.connect() as con:
         transaction = con.begin()
         try:
-            unique_companies = df[['id', 'company', 'company_group']].drop_duplicates()
+            unique_companies = companies_df[['id', 'company', 'company_group']].drop_duplicates()
             for _, row in unique_companies.iterrows():
                 check_query = text("SELECT COUNT(*) FROM Companies WHERE id = :id AND name = :company AND company_group = :company_group")
                 insert_query = text("""
@@ -370,7 +439,7 @@ def ensure_companies_exist(df):
             raise
     console.print(f"Number of new company inserts: {inserted_companies}", style="success")
 
-def ensure_centers_exist(df):
+def ensure_centers_exist(centers_df):
     engine = connect(localauth)
     inserted_centers = 0
     console.print("Ensuring all centers present in Kendra exist in the local database...", style="info")
@@ -378,7 +447,7 @@ def ensure_centers_exist(df):
     with engine.connect() as con:
         transaction = con.begin()
         try:
-            unique_centers = df[['center_id', 'center']].drop_duplicates()
+            unique_centers = centers_df[['center_id', 'center']].drop_duplicates()
             for _, row in unique_centers.iterrows():
                 check_query = text("SELECT COUNT(*) FROM Centers WHERE id = :center_id")
                 insert_query = text("""
@@ -396,153 +465,75 @@ def ensure_centers_exist(df):
             raise
     console.print(f"Number of new center inserts: {inserted_centers}", style="success")
 
-
-def delete_absent_managers():
-    engine_knd = connect(kndauth)
-    with engine_knd.connect() as con_knd:
-        result_knd = con_knd.execute(text("""SELECT
-                                            e2.id as id
-                                        FROM
-                                            employee e
-                                        INNER JOIN 
-                                            employee e2 ON e2.id = e.fleet_manager_id
-                                        WHERE
-                                            e.geolocation_latitude IS NOT NULL
-                                            AND e.geolocation_longitude IS NOT NULL
-                                            AND e.status = 'active'
-                                            AND e.position_id in (6, 30)
-                                        GROUP BY
-                                            e2.id
-                                        ORDER BY
-                                            e2.id;"""))
-        knd_manager_ids = set([row[0] for row in result_knd.fetchall()])
-
+def sync_shifts(shifts_df):
     engine_local = connect(localauth)
-    with engine_local.connect() as con_local:
-        result_local = con_local.execute(text("SELECT id FROM Managers"))
-        local_manager_ids = set([row[0] for row in result_local.fetchall()])
+    inserted_shifts = 0
+    console.print("Ensuring all shifts present in Kendra exist in the local database...", style="info")
 
-        managers_to_delete = local_manager_ids - knd_manager_ids
-        purged_managers_count = 0
-
-        for manager_id in managers_to_delete:
-            # Check for dependencies in the Vehicles table
-            vehicles_count = con_local.execute(text("SELECT COUNT(*) FROM Vehicles WHERE manager_id = :manager_id"), {'manager_id': manager_id}).fetchone()[0]
-
-            # Check for dependencies in the Drivers table
-            drivers_count = con_local.execute(text("SELECT COUNT(*) FROM Drivers WHERE manager_id = :manager_id"), {'manager_id': manager_id}).fetchone()[0]
-
-            if vehicles_count == 0 and drivers_count == 0:
-                # If no dependencies are found in either table, it's safe to delete the manager
-                con_local.execute(text("DELETE FROM Managers WHERE id = :manager_id"), {'manager_id': manager_id})
-                purged_managers_count += 1
-            else:
-                # Dependencies exist, so we skip deleting this manager
-                console.print(f"Skipping deletion of manager {manager_id} due to existing dependencies in Vehicles or Drivers tables.", style="warning")
-
-        console.print(f"Completed checking and deleting absent managers from local database. Total managers purged: {purged_managers_count}.", style="success")
-
-
-def fetch_and_insert_shift_data(kndauth, localauth):
-    select_query = text("""SELECT s.id AS shift_id, s.name AS name FROM shift s ORDER BY s.id;""")
-    insert_query = text("""INSERT IGNORE INTO Shifts (id, name) VALUES (:id, :name);""")
-
-    engine_knd = connect(kndauth)
-    with engine_knd.connect() as knd_conn:
-        result = knd_conn.execute(select_query)
-        shifts = result.fetchall()
-    
-    engine_local = connect(localauth)
-    with engine_local.connect() as local_conn:
-        for shift in shifts:
-            local_conn.execute(insert_query, {'id': shift[0], 'name': shift[1]})
-        local_conn.commit()
-        console.print("Shifts data inserted successfully", style="success")
-
-def fetch_and_insert_provinces(kndauth, localauth):
-    select_query = text("""SELECT p.id, p.name FROM province p ORDER BY p.id;""")
-    insert_query = text("""INSERT IGNORE INTO Provinces (id, name) VALUES (:id, :name);""")
-
-    engine_knd = connect(kndauth)
-    with engine_knd.connect() as knd_conn:
-        result = knd_conn.execute(select_query)
-        provinces = result.fetchall()
-    
-    engine_local = connect(localauth)
-    with engine_local.connect() as local_conn:
-        for province in provinces:
-            local_conn.execute(insert_query, {'id': province[0], 'name': province[1]})
-        local_conn.commit()
-        console.print("Provinces data inserted successfully", style="success")
-
-
-def delete_absent_drivers():
-    engine_knd = connect(kndauth)
-    knd_driver_ids_query = """
-        SELECT e.id
-        FROM employee e
-        INNER JOIN employee e2 ON e2.id = e.fleet_manager_id
-        INNER JOIN employee_contract c ON e.current_contract_id = c.id
-        INNER JOIN center ce ON c.working_center_id = ce.id
-        INNER JOIN address a ON ce.address_id = a.id
-        INNER JOIN employee_shifts es ON e.id = es.employee_id
-        INNER JOIN shift s ON s.id = es.shift_id
-        WHERE 
-            # e.geolocation_latitude IS NOT NULL
-            # AND e.geolocation_longitude IS NOT NULL
-            e.status = 'active'
-            AND (es.end_date IS NULL OR es.end_date >= date(now()))
-            AND es.start_date <= date(now())
-            AND e.position_id in (6, 30)
-            AND es.deleted_at IS NULL
-    """
-    with engine_knd.connect() as conn_knd:
-        result_knd = conn_knd.execute(text(knd_driver_ids_query))
-        knd_driver_ids = set([row[0] for row in result_knd.fetchall()])
-
-    engine_local = connect(localauth)
-    local_driver_ids_query = "SELECT kendra_id FROM Drivers"
-    with engine_local.connect() as conn_local:
-        result_local = conn_local.execute(text(local_driver_ids_query))
-        local_driver_ids = set([row[0] for row in result_local.fetchall()])
-
-    absent_driver_ids = local_driver_ids - knd_driver_ids
-    console.print(f"Absent Driver IDs: {absent_driver_ids}", style="info")
-
-    deleted_drivers_count = 0
-    delete_driver_query = "DELETE FROM Drivers WHERE kendra_id = :kendra_id"
-    with engine_local.connect() as conn_local:
-        transaction = conn_local.begin()
+    with engine_local.connect() as con:
+        transaction = con.begin()
         try:
-            for driver_id in absent_driver_ids:
-                conn_local.execute(text(delete_driver_query), {'kendra_id': driver_id})
-                deleted_drivers_count += 1
+            unique_shifts = shifts_df[['id', 'name']].drop_duplicates()
+            for _, row in unique_shifts.iterrows():
+                check_query = text("SELECT COUNT(*) FROM Shifts WHERE id = :id")
+                insert_query = text("""
+                    INSERT INTO Shifts (id, name) VALUES (:id, :name)
+                    ON DUPLICATE KEY UPDATE
+                    name = VALUES(name);
+                """)
+                result = con.execute(check_query, {'id': row['id']})
+                if result.fetchone()[0] == 0:
+                    con.execute(insert_query, {'id': row['id'], 'name': row['name']})
+                    inserted_shifts += 1
             transaction.commit()
-            console.print(f"Transaction committed, {deleted_drivers_count} drivers deleted.", style="success")
-        except Exception as e:
+        except:
             transaction.rollback()
-            console.print(f"An error occurred during transaction: {e}", style="error")
             raise
+    console.print(f"Number of new shift inserts: {inserted_shifts}", style="success")
 
-    # Verification of deletions
-    verify_query = "SELECT COUNT(*) FROM Drivers WHERE kendra_id = :kendra_id"
-    with engine_local.connect() as conn_local:
-        for driver_id in absent_driver_ids:
-            result_verify = conn_local.execute(text(verify_query), {'kendra_id': driver_id})
-            if result_verify.fetchone()[0] != 0:
-                console.print(f"Failed to delete driver with ID {driver_id}", style="error")
+def sync_provinces(provinces_df):
+    engine_local = connect(localauth)
+    inserted_provinces = 0
+    console.print("Ensuring all provinces present in Kendra exist in the local database...", style="info")
 
+    with engine_local.connect() as con:
+        transaction = con.begin()
+        try:
+            unique_provinces = provinces_df[['id', 'name']].drop_duplicates()
+            for _, row in unique_provinces.iterrows():
+                check_query = text("SELECT COUNT(*) FROM Provinces WHERE id = :id")
+                insert_query = text("""
+                    INSERT INTO Provinces (id, name) VALUES (:id, :name)
+                    ON DUPLICATE KEY UPDATE
+                    name = VALUES(name);
+                """)
+                result = con.execute(check_query, {'id': row['id']})
+                if result.fetchone()[0] == 0:
+                    con.execute(insert_query, {'id': row['id'], 'name': row['name']})
+                    inserted_provinces += 1
+            transaction.commit()
+        except:
+            transaction.rollback()
+            raise
+    console.print(f"Number of new province inserts: {inserted_provinces}", style="success")
 
-def fetch_and_insert_drivers(localauth, drivers_df):
-    
+def sync_drivers(drivers_df):
     insert_query = text("""
                     INSERT INTO 
                         Drivers (kendra_id, name, street, city, country, zip_code, lat, lng, province_id, manager_id, shift_id) 
                     VALUES 
                         (:kendra_id, :name, :street, :city, :country, :zip_code, :lat, :lng, :province_id, :manager_id, :shift_id) 
                     ON DUPLICATE KEY UPDATE 
-                        name = VALUES(name), street = VALUES(street), city = VALUES(city), country = VALUES(country), zip_code = VALUES(zip_code), 
-                        lat = VALUES(lat), lng = VALUES(lng), province_id = VALUES(province_id), manager_id = VALUES(manager_id), shift_id = VALUES(shift_id);""")
+                        name = VALUES(name), 
+                        street = VALUES(street),
+                        city = VALUES(city), 
+                        country = VALUES(country), 
+                        zip_code = VALUES(zip_code), 
+                        lat = VALUES(lat), 
+                        lng = VALUES(lng), 
+                        province_id = VALUES(province_id), 
+                        manager_id = VALUES(manager_id), 
+                        shift_id = VALUES(shift_id);""")
 
     engine_local = connect(localauth)
     with engine_local.connect() as local_conn:
@@ -550,17 +541,17 @@ def fetch_and_insert_drivers(localauth, drivers_df):
         try:
             for _, driver in drivers_df.iterrows():
                 local_conn.execute(insert_query, {
-                    'kendra_id': driver.kendra_id, 
-                    'name': driver.name, 
-                    'street': driver.street, 
-                    'city': driver.city, 
-                    'country': driver.country, 
-                    'zip_code': driver.zip_code, 
-                    'lat': driver.lat, 
-                    'lng': driver.lng, 
-                    'province_id': driver.province_id, 
-                    'manager_id': driver.manager_id, 
-                    'shift_id': driver.shift_id
+                    'kendra_id': driver['kendra_id'], 
+                    'name': driver['name'], 
+                    'street': driver['street'], 
+                    'city': driver['city'], 
+                    'country': driver['country'], 
+                    'zip_code': driver['zip_code'], 
+                    'lat': driver['lat'], 
+                    'lng': driver['lng'], 
+                    'province_id': driver['province_id'], 
+                    'manager_id': driver['manager_id'], 
+                    'shift_id': driver['shift_id']
                 })
             transaction.commit()
             console.print("Drivers data inserted successfully", style="success")
@@ -569,15 +560,15 @@ def fetch_and_insert_drivers(localauth, drivers_df):
             console.print(f"An error occurred during transaction: {e}", style="error")
 
 if __name__ == "__main__":
-    company_ids_df, vehicle_df, manager_df, vehicle_driver_exchange_df, drivers_df = get_entities_state_from_kendra()
-    delete_absent_managers()
+    companies_df, vehicle_df, manager_df, vehicle_driver_exchange_df, drivers_df, shifts_df, provinces_df = get_entities_state_from_kendra()
+    delete_absent_managers(manager_df)
     ensure_managers_exist(manager_df)
-    ensure_companies_exist(company_ids_df)
+    ensure_companies_exist(companies_df)
     ensure_centers_exist(vehicle_df)
-    insert_vehicle_data(vehicle_df)
-    delete_absent_drivers()
-    fetch_and_insert_shift_data(kndauth, localauth)
-    fetch_and_insert_provinces(kndauth, localauth)
-    fetch_and_insert_drivers(localauth, drivers_df)
-    synchronize_exchange_locations(exchange_locations)
-    sync_driver_vehicle_relationships(localauth, vehicle_driver_exchange_df)
+    sync_vehicles(vehicle_df)
+    delete_absent_drivers(drivers_df)
+    sync_shifts(shifts_df)
+    sync_provinces(provinces_df)
+    sync_drivers(drivers_df)
+    sync_exchange_locations(exchange_locations)
+    sync_driver_vehicle_relationships(vehicle_driver_exchange_df)
