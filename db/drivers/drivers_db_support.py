@@ -98,24 +98,42 @@ def fetch_driver_events_by_week_of_year(year, week, manager=None):
         params['manager'] = manager
     
     df = pd.read_sql(query, engine, params=params)
+    df['week'] = week
+    df['year'] = year
+    df['monday'] = monday
+    df['sunday'] = sunday
+    
     return df
 
 def get_week_start_end(year, week):
     first_day_of_year = datetime(year, 1, 1)
     first_monday = first_day_of_year + timedelta(days=(7 - first_day_of_year.weekday() if first_day_of_year.weekday() != 0 else 0))
     monday = first_monday + timedelta(weeks=week - 1)
+    
+    if monday.year > year:
+        monday = datetime(year, 12, 31) - timedelta(days=datetime(year, 12, 31).weekday())
     sunday = monday + timedelta(days=6)
+    
     return monday, sunday
 
-def fetch_driver_events_for_weeks(year, start_week, end_week, manager=None): 
-    all_weeks_df = [] 
-    for week in range(start_week, end_week + 1): 
-        df = fetch_driver_events_by_week_of_year(year, week, manager) 
-        df['week'] = week 
-        all_weeks_df.append(df) 
-
+def fetch_driver_events_for_weeks(start_year, start_week, end_year, end_week, manager=None):
+    all_weeks_df = []
+    
+    current_year = start_year
+    current_week = start_week
+    
+    while current_year < end_year or (current_year == end_year and current_week <= end_week):
+        df = fetch_driver_events_by_week_of_year(current_year, current_week, manager)
+        all_weeks_df.append(df)
+        
+        if current_week == 52:
+            current_week = 1
+            current_year += 1
+        else:
+            current_week += 1
+    
     combined_df = pd.concat(all_weeks_df, ignore_index=True)
-    combined_df = combined_df.sort_values(by=['week'])
+    combined_df = combined_df.sort_values(by=['year', 'week'])
 
     defined_plate_df = combined_df[combined_df['plate'].notna()]
     undefined_plate_df = combined_df[combined_df['plate'].isna()]
@@ -126,8 +144,9 @@ def fetch_driver_events_for_weeks(year, start_week, end_week, manager=None):
         employee_records = defined_plate_df[defined_plate_df['id'] == employee_id]
         
         if not employee_records.empty:
-            max_week = employee_records['week'].max()
-            last_assigned_row = employee_records[employee_records['week'] == max_week]
+            max_year = employee_records['year'].max()
+            max_week = employee_records[employee_records['year'] == max_year]['week'].max()
+            last_assigned_row = employee_records[(employee_records['year'] == max_year) & (employee_records['week'] == max_week)]
             last_assigned_plate = last_assigned_row['plate'].values[0]
         else:
             last_assigned_plate = 'unknown'

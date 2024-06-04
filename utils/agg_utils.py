@@ -211,16 +211,23 @@ def process_vacation_availability(df):
     pivot_up_to_plate.reset_index(inplace=True)
     
     pivot_up_to_plate.columns = pivot_up_to_plate.columns.astype(str)
-    pivot_up_to_plate.rename(columns={col: f'W{col}' for col in pivot_up_to_plate.columns if col.isdigit()}, inplace=True)
     
-    group_up_to_employee = df.groupby(['manager', 'plate', 'employee', 'week', 'shift']).agg({'vacaciones': 'sum'})
+    # Create a dictionary to map week numbers to the corresponding Monday-Sunday range
+    week_range_dict = df.groupby('week').agg({'monday': 'first', 'sunday': 'first'}).apply(lambda x: f"{x['monday'].date()} - {x['sunday'].date()}", axis=1).to_dict()
+    
+    # Rename the columns using the Monday-Sunday range
+    pivot_up_to_plate.rename(columns={col: f"W{col} ({week_range_dict.get(int(col), '')})" for col in pivot_up_to_plate.columns if col.isdigit()}, inplace=True)
+    
+    group_up_to_employee = df.groupby(['manager','plate', 'employee', 'week', 'shift']).agg({'vacaciones': 'sum'})
     group_up_to_employee.reset_index(inplace=True)
     
     pivot_up_to_employee = group_up_to_employee.pivot(index=['manager', 'plate', 'employee', 'shift'], columns=['week'], values='vacaciones').fillna(0)
     pivot_up_to_employee.reset_index(inplace=True)
     
     pivot_up_to_employee.columns = pivot_up_to_employee.columns.astype(str)
-    pivot_up_to_employee.rename(columns={col: f'W{col}' for col in pivot_up_to_employee.columns if col.isdigit()}, inplace=True)
+    
+    # Rename the columns using the Monday-Sunday range
+    pivot_up_to_employee.rename(columns={col: f"W{col} ({week_range_dict.get(int(col), '')})" for col in pivot_up_to_employee.columns if col.isdigit()}, inplace=True)
     
     pivot_up_to_employee = pivot_up_to_employee.astype(object)
     
@@ -229,10 +236,9 @@ def process_vacation_availability(df):
     for index, row in pivot_up_to_employee.iterrows():
         manager = row['manager']
         plate = row['plate']
-        shift = row['shift']
         
         for week in week_columns:
-            value_up_to_plate = pivot_up_to_plate.loc[(pivot_up_to_plate['manager'] == manager) & (pivot_up_to_plate['plate'] == plate) & (pivot_up_to_plate['shift'] == shift), week].values[0]
+            value_up_to_plate = pivot_up_to_plate.loc[(pivot_up_to_plate['manager'] == manager) & (pivot_up_to_plate['plate'] == plate), week].values[0]
             if value_up_to_plate >= 1:
                 if pivot_up_to_employee.loc[index, week] == 1:
                     pivot_up_to_employee.loc[index, week] = 'Vacaciones'
@@ -241,7 +247,8 @@ def process_vacation_availability(df):
             else:
                 pivot_up_to_employee.loc[index, week] = 'Disponible'
     
-    pivot_up_to_employee.set_index(['manager', 'plate', 'employee', 'shift'], inplace=True)
+    pivot_up_to_employee.set_index(['manager', 'plate', 'employee'], inplace=True)
+    
     pivot_up_to_employee.reset_index(inplace=True)
     
     return pivot_up_to_employee

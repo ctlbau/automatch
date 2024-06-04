@@ -39,7 +39,17 @@ def render_content(tab):
         ])
         return vacations_layout
     elif tab == 'exchange-locations':
-        return exchange_locations_layout
+        exchange_layout = dbc.Container([
+            dbc.Row([
+                dbc.Col([
+                    create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select Province', multi=True, add_all=True),
+                    html.Div(id='driver-count-per-exchange-location-and-shift-container', children=[]),
+                    html.Button('Download CSV', id='download-driver-count-per-exchange-location-and-shift-csv', n_clicks=0),
+                    create_modal('driver-count-disaggregation-modal', 'driver-count-disaggregation-title', 'driver-count-disaggregation-content', 'driver-count-disaggregation-footer')
+                ])
+            ])
+        ])
+        return exchange_layout
 
 @callback(
     Output('driver-availability-container', 'children'),
@@ -54,7 +64,7 @@ def create_vacations_grid(start_date, end_date, manager, plate):
         start_date = datetime.strptime(start_date, '%Y-%m-%d')
         end_date = datetime.strptime(end_date, '%Y-%m-%d')
         start_week, end_week = start_date.isocalendar()[1], end_date.isocalendar()[1]
-        availability = fetch_driver_events_for_weeks(start_date.year, start_week, end_week, manager)
+        availability = fetch_driver_events_for_weeks(start_date.year, start_week, end_date.year, end_week, manager)
         availability = process_vacation_availability(availability)
         if manager:
             availability = availability.drop(columns=['manager'])
@@ -66,18 +76,6 @@ def create_vacations_grid(start_date, end_date, manager, plate):
         return grid
     else:
         return None
-
-
-exchange_locations_layout = dbc.Container([
-    dbc.Row([
-        dbc.Col([
-            create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select Province', multi=True, add_all=True),
-            html.Div(id='driver-count-per-exchange-location-and-shift-container', children=[]),
-            html.Button('Download CSV', id='download-driver-count-per-exchange-location-and-shift-csv', n_clicks=0),
-            create_modal('driver-count-disaggregation-modal', 'driver-count-disaggregation-title', 'driver-count-disaggregation-content', 'driver-count-disaggregation-footer')
-        ])
-    ])
-])
 
 @callback(
     Output('driver-count-per-exchange-location-and-shift-container', 'children'),
