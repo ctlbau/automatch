@@ -203,41 +203,42 @@ def process_vacation_availability(df):
     vacaciones = ['Vacaciones', 'Vacaciones año anterior']
     df['vacaciones'] = df['event'].apply(lambda x: 1 if x in vacaciones else 0)
     
-    group_up_to_plate = df.groupby(['manager', 'plate', 'week', 'shift'])
+    group_up_to_plate = df.groupby(['manager', 'plate', 'shift', 'week', 'year'])
     group_up_to_plate = group_up_to_plate.agg({'vacaciones': 'sum'})
     group_up_to_plate.reset_index(inplace=True)
     
-    pivot_up_to_plate = group_up_to_plate.pivot(index=['manager', 'plate', 'shift'], columns=['week'], values='vacaciones').fillna(0)
+    pivot_up_to_plate = group_up_to_plate.pivot(index=['manager', 'plate', 'shift'], columns=['year', 'week'], values='vacaciones').fillna(0)
+    pivot_up_to_plate.columns = [f"{col[0]}-W{col[1]}" for col in pivot_up_to_plate.columns]
     pivot_up_to_plate.reset_index(inplace=True)
     
-    pivot_up_to_plate.columns = pivot_up_to_plate.columns.astype(str)
-    
-    # Create a dictionary to map week numbers to the corresponding Monday-Sunday range
-    week_range_dict = df.groupby('week').agg({'monday': 'first', 'sunday': 'first'}).apply(lambda x: f"{x['monday'].date()} - {x['sunday'].date()}", axis=1).to_dict()
+    # Create a dictionary to map year-week combinations to the corresponding Monday-Sunday range
+    week_range_dict = df.groupby(['year', 'week']).agg({'monday': 'first', 'sunday': 'first'}).apply(lambda x: f"{x['monday'].date()} - {x['sunday'].date()}", axis=1).to_dict()
     
     # Rename the columns using the Monday-Sunday range
-    pivot_up_to_plate.rename(columns={col: f"W{col} ({week_range_dict.get(int(col), '')})" for col in pivot_up_to_plate.columns if col.isdigit()}, inplace=True)
+    pivot_up_to_plate.rename(columns={col: f"{col} ({week_range_dict.get((int(col.split('-')[0]), int(col.split('-')[1][1:])), '')})" for col in pivot_up_to_plate.columns if '-W' in col}, inplace=True)
     
-    group_up_to_employee = df.groupby(['manager','plate', 'employee', 'week', 'shift']).agg({'vacaciones': 'sum'})
+    group_up_to_employee = df.groupby(['manager','plate', 'employee', 'shift', 'week', 'year']).agg({'vacaciones': 'sum'})
     group_up_to_employee.reset_index(inplace=True)
     
-    pivot_up_to_employee = group_up_to_employee.pivot(index=['manager', 'plate', 'employee', 'shift'], columns=['week'], values='vacaciones').fillna(0)
+    pivot_up_to_employee = group_up_to_employee.pivot(index=['manager', 'plate', 'employee', 'shift'], columns=['year', 'week'], values='vacaciones').fillna(0)
+    pivot_up_to_employee.columns = [f"{col[0]}-W{col[1]}" for col in pivot_up_to_employee.columns]
     pivot_up_to_employee.reset_index(inplace=True)
     
-    pivot_up_to_employee.columns = pivot_up_to_employee.columns.astype(str)
-    
     # Rename the columns using the Monday-Sunday range
-    pivot_up_to_employee.rename(columns={col: f"W{col} ({week_range_dict.get(int(col), '')})" for col in pivot_up_to_employee.columns if col.isdigit()}, inplace=True)
+    pivot_up_to_employee.rename(columns={col: f"{col} ({week_range_dict.get((int(col.split('-')[0]), int(col.split('-')[1][1:])), '')})" for col in pivot_up_to_employee.columns if '-W' in col}, inplace=True)
     
     pivot_up_to_employee = pivot_up_to_employee.astype(object)
     
-    week_columns = [col for col in pivot_up_to_employee.columns if col.startswith('W')]
+    week_columns = [col for col in pivot_up_to_employee.columns if '-W' in col]
+    
+    # Sort the week columns based on the year and week number
+    sorted_week_columns = sorted(week_columns, key=lambda x: (int(x.split('-')[0].split(' ')[0]), int(x.split('-')[1].split(' ')[0][1:])))
     
     for index, row in pivot_up_to_employee.iterrows():
         manager = row['manager']
         plate = row['plate']
         
-        for week in week_columns:
+        for week in sorted_week_columns:
             value_up_to_plate = pivot_up_to_plate.loc[(pivot_up_to_plate['manager'] == manager) & (pivot_up_to_plate['plate'] == plate), week].values[0]
             if value_up_to_plate >= 1:
                 if pivot_up_to_employee.loc[index, week] == 1:
@@ -246,6 +247,9 @@ def process_vacation_availability(df):
                     pivot_up_to_employee.loc[index, week] = 'No disponible'
             else:
                 pivot_up_to_employee.loc[index, week] = 'Disponible'
+    
+    # Reorder the columns based on the sorted week columns
+    pivot_up_to_employee = pivot_up_to_employee[['manager', 'plate', 'employee'] + sorted_week_columns]
     
     pivot_up_to_employee.set_index(['manager', 'plate', 'employee'], inplace=True)
     
