@@ -290,7 +290,7 @@ def create_data_table(id, data, filename, page_size=10, custom_height=None):
         className="ag-theme-quartz",
     )
     if custom_height is not None:
-        grid.style = {'height': custom_height}
+        grid.style = {'height': custom_height, 'width': '100%'}
     return grid
 
 def create_grouped_graph(data, values_type):

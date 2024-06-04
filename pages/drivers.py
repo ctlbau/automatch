@@ -33,7 +33,7 @@ def render_content(tab):
                     create_date_range_picker('availability-date-range-picker', min_date, max_date),
                     create_dropdown('manager-dropdown', options=manager_options, label='name', value='name', placeholder='Select manager', multi=False, add_all=True),
                     create_dropdown('plate-dropdown', options=plates_options, label='plate', value='plate', placeholder='Select plate', multi=False, add_all=False),
-                    dcc.Loading(html.Div(id='driver-availability-container', children=[]), type='circle'),
+                    dcc.Loading(html.Div(id='driver-availability-container', children=[], style={'width': '100%'}), type='circle'),
                 ])
             ])
         ])
@@ -43,10 +43,11 @@ def render_content(tab):
 
 @callback(
     Output('driver-availability-container', 'children'),
-    State('availability-date-range-picker', 'start_date'),
-    State('availability-date-range-picker', 'end_date'),
+    Input('availability-date-range-picker', 'start_date'),
+    Input('availability-date-range-picker', 'end_date'),
     Input('manager-dropdown', 'value'),
-    Input('plate-dropdown', 'value')
+    Input('plate-dropdown', 'value'),
+    prevent_initial_callback=True
 )
 def create_vacations_grid(start_date, end_date, manager, plate):
     if start_date and end_date and manager:
@@ -59,9 +60,8 @@ def create_vacations_grid(start_date, end_date, manager, plate):
             availability = availability.drop(columns=['manager'])
         if plate:
             availability = availability[availability['plate'] == plate]
-            # availability = availability.drop(columns=['plate'])
         page_size = len(availability)
-        custom_height = '600px' if page_size > 10 else None
+        custom_height = '700px' if page_size > 10 else None
         grid = create_data_table("driver-availability-grid", availability, f"driver-availability-for-{start_date}-{end_date}.csv", page_size=page_size, custom_height=custom_height)
         return grid
     else:

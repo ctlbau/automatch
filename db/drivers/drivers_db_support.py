@@ -133,8 +133,6 @@ def fetch_driver_events_for_weeks(year, start_week, end_week, manager=None):
             last_assigned_plate = 'unknown'
         
         combined_df.loc[(combined_df['id'] == employee_id) & (combined_df['plate'].isna()), 'plate'] = last_assigned_plate
-    
-    combined_df.drop_duplicates(subset=['event_id'], keep='first', inplace=True)
 
     return combined_df
 
