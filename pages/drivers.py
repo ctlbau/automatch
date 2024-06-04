@@ -125,10 +125,11 @@ def create_data_table_on_page_load(province_ids):
     [
         Input('driver-count-per-exchange-location-and-shift-grid', 'cellClicked'),
         Input('driver-count-per-exchange-location-and-shift-grid', 'selectedRows'),
+        State('province-dropdown', 'value')
     ],
     prevent_initial_callback=True
 )
-def open_modal(clicked_cell, clicked_row):
+def open_modal(clicked_cell, clicked_row, province_ids):
     if (clicked_cell and 'colId' in clicked_cell and 'value' in clicked_cell and
         clicked_row and clicked_row[0] and 'exchange location' in clicked_row[0] and
         clicked_cell['colId'] != 'exchange location' and clicked_cell['colId'] != 'Total' and
@@ -137,7 +138,7 @@ def open_modal(clicked_cell, clicked_row):
         shift = clicked_cell['colId']
         value = clicked_cell['value']
         exchange_location = clicked_row[0]['exchange location']
-        drivers_exchange_location_and_shift = fetch_drivers_exchange_location_and_shift()
+        drivers_exchange_location_and_shift = fetch_drivers_exchange_location_and_shift(province_ids)
         drivers_exchange_location_and_shift['exchange_location'] = drivers_exchange_location_and_shift['exchange_location'].fillna('Unknown')
         drivers_exchange_location_and_shift_filtered = drivers_exchange_location_and_shift[
             (drivers_exchange_location_and_shift['exchange_location'] == exchange_location) &
