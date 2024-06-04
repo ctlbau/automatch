@@ -198,3 +198,49 @@ def calculate_block_holes(vehicle_shifts):
     
     block_holes_df = pd.concat(block_holes, ignore_index=True)
     return block_holes_df 
+
+def process_vacation_availability(df):
+    vacaciones = ['Vacaciones', 'Vacaciones año anterior']
+    df['vacaciones'] = df['event'].apply(lambda x: 1 if x in vacaciones else 0)
+    
+    group_up_to_plate = df.groupby(['manager', 'plate', 'week'])
+    group_up_to_plate = group_up_to_plate.agg({'vacaciones': 'sum'})
+    group_up_to_plate.reset_index(inplace=True)
+    
+    pivot_up_to_plate = group_up_to_plate.pivot(index=['manager', 'plate'], columns=['week'], values='vacaciones').fillna(0)
+    pivot_up_to_plate.reset_index(inplace=True)
+    
+    pivot_up_to_plate.columns = pivot_up_to_plate.columns.astype(str)
+    pivot_up_to_plate.rename(columns={col: f'W{col}' for col in pivot_up_to_plate.columns if col.isdigit()}, inplace=True)
+    
+    group_up_to_employee = df.groupby(['manager','plate', 'employee', 'week']).agg({'vacaciones': 'sum'})
+    group_up_to_employee.reset_index(inplace=True)
+    
+    pivot_up_to_employee = group_up_to_employee.pivot(index=['manager', 'plate', 'employee'], columns=['week'], values='vacaciones').fillna(0)
+    pivot_up_to_employee.reset_index(inplace=True)
+    
+    pivot_up_to_employee.columns = pivot_up_to_employee.columns.astype(str)
+    pivot_up_to_employee.rename(columns={col: f'W{col}' for col in pivot_up_to_employee.columns if col.isdigit()}, inplace=True)
+    
+    pivot_up_to_employee = pivot_up_to_employee.astype(object)
+    
+    week_columns = [col for col in pivot_up_to_employee.columns if col.startswith('W')]
+    
+    for index, row in pivot_up_to_employee.iterrows():
+        manager = row['manager']
+        plate = row['plate']
+        
+        for week in week_columns:
+            value_up_to_plate = pivot_up_to_plate.loc[(pivot_up_to_plate['manager'] == manager) & (pivot_up_to_plate['plate'] == plate), week].values[0]
+            if value_up_to_plate >= 1:
+                if pivot_up_to_employee.loc[index, week] == 1:
+                    pivot_up_to_employee.loc[index, week] = 'Vacaciones'
+                else:
+                    pivot_up_to_employee.loc[index, week] = 'No disponible'
+            else:
+                pivot_up_to_employee.loc[index, week] = 'Disponible'
+    
+    pivot_up_to_employee.set_index(['manager', 'plate', 'employee'], inplace=True)
+    pivot_up_to_employee.reset_index(inplace=True)
+    
+    return pivot_up_to_employee

@@ -209,7 +209,7 @@ def create_date_range_picker(id, min_date, max_date):
                             end_date=today,
                             min_date_allowed=min_date,
                             max_date_allowed=max_date,
-                            display_format='D MMM YY',
+                            display_format='D MMM YYYY',
                         ), className="col-md-4 offset-md-4 col-12"
                     )
                 ]

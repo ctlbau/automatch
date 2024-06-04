@@ -1,16 +1,74 @@
 import dash
 from dash import callback, html, dcc
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
-from db.drivers import fetch_drivers_exchange_location_and_shift, fetch_provinces
-from ui.components import create_data_table, create_modal, create_dropdown
+from db.drivers import fetch_drivers_exchange_location_and_shift, fetch_provinces, fetch_driver_events_for_weeks, get_min_max_dates_from_schedule_events, fetch_managers, fetch_plates
+from ui.components import create_data_table, create_modal, create_dropdown, create_date_range_picker
+from utils.agg_utils import process_vacation_availability
 from datetime import datetime
 import plotly.express as px
 
 dash.register_page(__name__, path='/drivers')
 
-layout = dbc.Container([
-    dcc.Location(id='url', refresh=False),
+layout = html.Div([
+    dcc.Tabs(id='driver-tabs', value='availability', children=[
+        dcc.Tab(label='Vacations', value='availability'),
+        dcc.Tab(label='Exchange Locations', value='exchange-locations')
+    ], className="col-md-3 offset-md-1 col-12"),
+    html.Div(id='driver-tabs-content')
+])
+
+@callback(
+    Output('driver-tabs-content', 'children'),
+    Input('driver-tabs', 'value')
+)
+def render_content(tab):
+    if tab == 'availability':
+        min_date, max_date = get_min_max_dates_from_schedule_events()
+        manager_options = fetch_managers().to_dict('records')
+        plates_options = fetch_plates().to_dict('records')
+        vacations_layout = dbc.Container([
+            dbc.Row([
+                dbc.Col([
+                    create_date_range_picker('availability-date-range-picker', min_date, max_date),
+                    create_dropdown('manager-dropdown', options=manager_options, label='name', value='name', placeholder='Select manager', multi=False, add_all=True),
+                    create_dropdown('plate-dropdown', options=plates_options, label='plate', value='plate', placeholder='Select plate', multi=False, add_all=False),
+                    dcc.Loading(html.Div(id='driver-availability-container', children=[]), type='circle'),
+                ])
+            ])
+        ])
+        return vacations_layout
+    elif tab == 'exchange-locations':
+        return exchange_locations_layout
+
+@callback(
+    Output('driver-availability-container', 'children'),
+    State('availability-date-range-picker', 'start_date'),
+    State('availability-date-range-picker', 'end_date'),
+    Input('manager-dropdown', 'value'),
+    Input('plate-dropdown', 'value')
+)
+def create_vacations_grid(start_date, end_date, manager, plate):
+    if start_date and end_date and manager:
+        start_date = datetime.strptime(start_date, '%Y-%m-%d')
+        end_date = datetime.strptime(end_date, '%Y-%m-%d')
+        start_week, end_week = start_date.isocalendar()[1], end_date.isocalendar()[1]
+        availability = fetch_driver_events_for_weeks(start_date.year, start_week, end_week, manager)
+        availability = process_vacation_availability(availability)
+        if manager:
+            availability = availability.drop(columns=['manager'])
+        if plate:
+            availability = availability[availability['plate'] == plate]
+            # availability = availability.drop(columns=['plate'])
+        page_size = len(availability)
+        custom_height = '600px' if page_size > 10 else None
+        grid = create_data_table("driver-availability-grid", availability, f"driver-availability-for-{start_date}-{end_date}.csv", page_size=page_size, custom_height=custom_height)
+        return grid
+    else:
+        return None
+
+
+exchange_locations_layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select Province', multi=True, add_all=True),
