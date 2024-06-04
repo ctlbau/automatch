@@ -15,7 +15,7 @@ def fetch_provinces():
     engine = connect(database)
     query = text("SELECT id, name FROM Provinces;")
     provinces_df = pd.read_sql(query, engine)
-    provinves = ['Madrid', 'Barcelona', 'Valencia', 'Málaga']
+    provinves = ['Madrid', 'Barcelona', 'Valencia', 'Málaga', 'Toledo']
     provinces_df = provinces_df[provinces_df['name'].isin(provinves)]
     provinces_df = provinces_df.sort_values(by='name')
     return provinces_df
@@ -43,4 +43,3 @@ def fetch_drivers_exchange_location_and_shift(province_ids: list = None):
         df = pd.read_sql(query, engine)
         
     return df
-

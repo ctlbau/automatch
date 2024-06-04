@@ -2,7 +2,6 @@ import dash
 from dash import callback, html, dcc
 from dash.dependencies import Input, Output
 import dash_bootstrap_components as dbc
-import pandas as pd
 from db.drivers import fetch_drivers_exchange_location_and_shift, fetch_provinces
 from ui.components import create_data_table, create_modal, create_dropdown
 from datetime import datetime
