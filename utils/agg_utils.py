@@ -211,10 +211,8 @@ def process_vacation_availability(df):
     pivot_up_to_plate.columns = [f"{col[0]}-W{col[1]}" for col in pivot_up_to_plate.columns]
     pivot_up_to_plate.reset_index(inplace=True)
     
-    # Create a dictionary to map year-week combinations to the corresponding Monday-Sunday range
     week_range_dict = df.groupby(['year', 'week']).agg({'monday': 'first', 'sunday': 'first'}).apply(lambda x: f"{x['monday'].date()} - {x['sunday'].date()}", axis=1).to_dict()
     
-    # Rename the columns using the Monday-Sunday range
     pivot_up_to_plate.rename(columns={col: f"{col} ({week_range_dict.get((int(col.split('-')[0]), int(col.split('-')[1][1:])), '')})" for col in pivot_up_to_plate.columns if '-W' in col}, inplace=True)
     
     group_up_to_employee = df.groupby(['manager','plate', 'employee', 'shift', 'week', 'year']).agg({'vacaciones': 'sum'})
@@ -224,14 +222,12 @@ def process_vacation_availability(df):
     pivot_up_to_employee.columns = [f"{col[0]}-W{col[1]}" for col in pivot_up_to_employee.columns]
     pivot_up_to_employee.reset_index(inplace=True)
     
-    # Rename the columns using the Monday-Sunday range
     pivot_up_to_employee.rename(columns={col: f"{col} ({week_range_dict.get((int(col.split('-')[0]), int(col.split('-')[1][1:])), '')})" for col in pivot_up_to_employee.columns if '-W' in col}, inplace=True)
     
     pivot_up_to_employee = pivot_up_to_employee.astype(object)
     
     week_columns = [col for col in pivot_up_to_employee.columns if '-W' in col]
     
-    # Sort the week columns based on the year and week number
     sorted_week_columns = sorted(week_columns, key=lambda x: (int(x.split('-')[0].split(' ')[0]), int(x.split('-')[1].split(' ')[0][1:])))
     
     for index, row in pivot_up_to_employee.iterrows():
@@ -248,7 +244,6 @@ def process_vacation_availability(df):
             else:
                 pivot_up_to_employee.loc[index, week] = 'Disponible'
     
-    # Reorder the columns based on the sorted week columns
     pivot_up_to_employee = pivot_up_to_employee[['manager', 'plate', 'employee'] + sorted_week_columns]
     
     pivot_up_to_employee.set_index(['manager', 'plate', 'employee'], inplace=True)

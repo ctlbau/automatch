@@ -113,6 +113,8 @@ def get_week_start_end(year, week):
     if monday.year > year:
         monday = datetime(year, 12, 31) - timedelta(days=datetime(year, 12, 31).weekday())
     sunday = monday + timedelta(days=6)
+    # Set sunday to the end of the day
+    sunday = sunday.replace(hour=23, minute=59, second=59)
     
     return monday, sunday
 
