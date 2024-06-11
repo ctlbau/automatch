@@ -69,7 +69,7 @@ def render_manager_event_container(start_date, end_date, manager, events):
     pivot['Total'] = pivot[numeric_cols].sum(axis=1)
     
     table = create_data_table('events-table', pivot, 'events.csv')
-    fig = px.line(
+    line_fig = px.line(
         dfg,
         x='week',
         y='event_count',
@@ -77,11 +77,17 @@ def render_manager_event_container(start_date, end_date, manager, events):
         title=f'Event Count from week {start_week} to {end_week} for {manager}'
     )
 
-    fig.update_layout(
+    line_fig.update_layout(
         xaxis_title="Week",
         yaxis_title="Event Count",
         yaxis_type="log",
         xaxis_tickangle=-45
     )
 
-    return [dcc.Graph(figure=fig), table]
+    pie_fig = px.pie(
+        dfg,
+        values='event_count',
+        names='event'
+    )
+
+    return [dcc.Graph(figure=line_fig), dcc.Graph(figure=pie_fig), table]
