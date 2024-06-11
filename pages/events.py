@@ -69,25 +69,39 @@ def render_manager_event_container(start_date, end_date, manager, events):
     pivot['Total'] = pivot[numeric_cols].sum(axis=1)
     
     table = create_data_table('events-table', pivot, 'events.csv')
+    
+    color_map = px.colors.qualitative.Plotly
+    event_colors = {event: color_map[i % len(color_map)] for i, event in enumerate(dfg['event'].unique())}
+    
     line_fig = px.line(
         dfg,
         x='week',
         y='event_count',
         color='event',
-        title=f'Event Count from week {start_week} to {end_week} for {manager}'
+        title=f'Event Count from week {start_week} to {end_week} for {manager}',
+        color_discrete_map=event_colors
     )
 
     line_fig.update_layout(
         xaxis_title="Week",
         yaxis_title="Event Count",
         yaxis_type="log",
-        xaxis_tickangle=-45
+        xaxis_tickangle=-45,
+        showlegend=False
     )
 
     pie_fig = px.pie(
         dfg,
         values='event_count',
-        names='event'
+        names='event',
+        color='event',
+        color_discrete_map=event_colors
     )
 
-    return [dcc.Graph(figure=line_fig), dcc.Graph(figure=pie_fig), table]
+    return [
+        dbc.Row([
+            dbc.Col(dcc.Graph(figure=line_fig), width=6),
+            dbc.Col(dcc.Graph(figure=pie_fig), width=6)
+        ]),
+        table
+    ]
