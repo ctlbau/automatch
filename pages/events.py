@@ -38,7 +38,7 @@ def render_content(tab):
                             {'label': 'Counts', 'value': 'count'},
                             {'label': 'Proportional', 'value': 'proportion'}
                         ],
-                        value='proportion',
+                        value='count',
                         labelStyle={'display': 'inline-block'}
                     ),
                     dcc.Loading(html.Div(id='manager-event-container', children=[], style={'width': '100%'}), type='circle'),
@@ -61,7 +61,7 @@ def render_content(tab):
                             {'label': 'Counts', 'value': 'count'},
                             {'label': 'Proportional', 'value': 'proportion'}
                         ],
-                        value='proportion',
+                        value='count',
                         labelStyle={'display': 'inline-block'}
                     ),
                     dcc.Loading(html.Div(id='driver-event-container', children=[], style={'width': '100%'}), type='circle'),
@@ -184,6 +184,8 @@ def render_driver_event_container(start_date, end_date, drivers, events, scale):
     df = df[(df['start'] >= start_date) & (df['end'] <= end_date)]
     start_week = df['week'].min()
     end_week = df['week'].max()
+    if df['week'].isna().any():
+        return html.Div("Error: Week data contains missing values.")
     total_col = df.groupby('week').size().reset_index(name='total_count')
     dfg = df.groupby(['week', 'event']).agg({'event': 'count'}).rename(columns={'event': 'count'})
     dfg.reset_index(inplace=True)
@@ -235,21 +237,19 @@ def render_driver_event_container(start_date, end_date, drivers, events, scale):
         orientation='h'
     )
     global_hist_fig.update_layout(xaxis_type="log")
-    global_hist_fig.update_layout(xaxis_tickformat=".1%")
+    global_hist_fig.update_layout(showlegend=False)
     if scale == 'count':
-        global_hist_fig.update_layout(yaxis_type="log", showlegend=False)
         global_hist_fig.update_layout(yaxis_title="Event Count")
     if scale == 'proportion':
-        global_hist_fig.update_layout(xaxis_type="log", showlegend=False)
         global_hist_fig.update_layout(xaxis_title="Proportion")
-        global_hist_fig.update_layout(yaxis_tickformat=".1%")
+        global_hist_fig.update_layout(xaxis_tickformat=".1%")
 
     histograms.append(dbc.Col(dcc.Graph(figure=global_hist_fig), width=12))
 
-    return [
+    return dcc.Loading([
         dbc.Row(histograms),
         grid
-    ]
+    ], type='circle')
 
 @callback(
     Output('employee-dropdown', 'options'),

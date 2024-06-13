@@ -274,4 +274,5 @@ def expand_event_days(row):
 def expand_events(df):
     expanded_df = pd.DataFrame([day for row in df.itertuples(index=False) for day in expand_event_days(row)])
     expanded_df = expanded_df.sort_values(by=['date'])
+    expanded_df.dropna(inplace=True)
     return expanded_df
