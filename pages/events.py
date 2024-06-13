@@ -100,6 +100,7 @@ def render_manager_event_container(start_date, end_date, managers, events, scale
     dfg = pd.merge(dfg, total_col, on=['week'], how='left')
     dfg['proportion'] = dfg['count'] / dfg['total_count']
     dfg['proportion'] = dfg['proportion'].apply(lambda x: round(x, 3))
+    dfg = dfg.sort_values(by=scale, ascending=False)
     pivot = dfg.pivot(index=['event'], columns=['week'], values=scale).fillna(0)
     pivot = pivot.reset_index()
     
@@ -114,10 +115,10 @@ def render_manager_event_container(start_date, end_date, managers, events, scale
     event_colors = {event: color_map[i % len(color_map)] for i, event in enumerate(dfg['event'].unique())}
 
     dfg = dfg.sort_values(by=scale, ascending=False)
-    histograms = []
+    bars = []
     for week in range(start_week, end_week + 1):
         week_data = dfg[dfg['week'] == week]
-        hist_fig = px.bar(
+        bar_fig = px.bar(
             week_data,
             x=scale,
             y='event', 
@@ -126,17 +127,21 @@ def render_manager_event_container(start_date, end_date, managers, events, scale
             color_discrete_map=event_colors,
             orientation='h'
         )
-        hist_fig.update_layout(xaxis_type="log")
-        hist_fig.update_layout(showlegend=False)
-        hist_fig.update_layout(yaxis_title="Events")
+        bar_fig.update_layout(showlegend=False)
+        bar_fig.update_layout(yaxis_title="Events")
         if scale == 'proportion':
-            hist_fig.update_layout(xaxis_title="Proportion")
-            hist_fig.update_layout(xaxis_tickformat=".1%")
-            hist_fig.update_layout(xaxis_tickangle=-45)
-        histograms.append(dbc.Col(dcc.Graph(figure=hist_fig), width=6))
+            bar_fig.update_layout(xaxis_title="Proportion")
+            bar_fig.update_layout(xaxis_tickformat=".1%")
+            bar_fig.update_layout(xaxis_tickangle=-45)
+        bars.append(dbc.Col(dcc.Graph(figure=bar_fig), width=6))
 
-    global_hist_fig = px.bar(
-        dfg,
+    global_data = df.groupby('event').agg({'event': 'count'}).rename(columns={'event': 'count'})
+    global_data['proportion'] = global_data['count'] / global_data['count'].sum()
+    global_data['proportion'] = global_data['proportion'].apply(lambda x: round(x, 3))
+    global_data = global_data.reset_index()
+    global_data = global_data.sort_values(by=scale, ascending=False)
+    global_bar_fig = px.bar(
+        global_data,
         x=scale,
         y='event',
         color='event',
@@ -144,20 +149,20 @@ def render_manager_event_container(start_date, end_date, managers, events, scale
         color_discrete_map=event_colors,
         orientation='h'
     )
-    global_hist_fig.update_layout(xaxis_type="log")
-    global_hist_fig.update_layout(showlegend=False)
+    global_bar_fig.update_layout(showlegend=False)
+    global_bar_fig.update_layout(xaxis_type="log")
     if scale == 'count':
-        global_hist_fig.update_layout(yaxis_title="Event Count")
+        global_bar_fig.update_layout(yaxis_title="Event Count")
     if scale == 'proportion':
-        global_hist_fig.update_layout(xaxis_title="Proportion")
-        global_hist_fig.update_layout(xaxis_tickformat=".1%")
+        global_bar_fig.update_layout(xaxis_title="Proportion")
+        global_bar_fig.update_layout(xaxis_tickformat=".1%")
 
-    histograms.append(dbc.Col(dcc.Graph(figure=global_hist_fig), width=12))
+    bars.append(dbc.Col(dcc.Graph(figure=global_bar_fig), width=12))
 
-    return [
-        dbc.Row(histograms),
+    return dcc.Loading([
+        dbc.Row(bars),
         grid
-    ]
+    ], type='circle')
 
 
 @callback(
@@ -184,14 +189,13 @@ def render_driver_event_container(start_date, end_date, drivers, events, scale):
     df = df[(df['start'] >= start_date) & (df['end'] <= end_date)]
     start_week = df['week'].min()
     end_week = df['week'].max()
-    if df['week'].isna().any():
-        return html.Div("Error: Week data contains missing values.")
     total_col = df.groupby('week').size().reset_index(name='total_count')
     dfg = df.groupby(['week', 'event']).agg({'event': 'count'}).rename(columns={'event': 'count'})
     dfg.reset_index(inplace=True)
     dfg = pd.merge(dfg, total_col, on=['week'], how='left')
     dfg['proportion'] = dfg['count'] / dfg['total_count']
     dfg['proportion'] = dfg['proportion'].apply(lambda x: round(x, 3))
+    dfg = dfg.sort_values(by=scale, ascending=False)
     pivot = dfg.pivot(index=['event'], columns=['week'], values=scale).fillna(0.000)
     pivot = pivot.reset_index()
     page_size = len(pivot)
@@ -205,11 +209,10 @@ def render_driver_event_container(start_date, end_date, drivers, events, scale):
     color_map = px.colors.qualitative.Plotly
     event_colors = {event: color_map[i % len(color_map)] for i, event in enumerate(dfg['event'].unique())}
 
-    dfg = dfg.sort_values(by=scale, ascending=False)
-    histograms = []
+    bars = []
     for week in range(start_week, end_week + 1):
         week_data = dfg[dfg['week'] == week]
-        hist_fig = px.bar(
+        bar_fig = px.bar(
             week_data,
             x=scale,
             y='event', 
@@ -218,17 +221,22 @@ def render_driver_event_container(start_date, end_date, drivers, events, scale):
             color_discrete_map=event_colors,
             orientation='h'
         )
-        hist_fig.update_layout(showlegend=False)
-        hist_fig.update_layout(yaxis_title="Events")
-        hist_fig.update_layout(xaxis_type="log")
+        bar_fig.update_layout(showlegend=False)
+        bar_fig.update_layout(yaxis_title="Events")
+        bar_fig.update_layout(xaxis_type="log")
         if scale == 'proportion':
-            hist_fig.update_layout(xaxis_title="Proportion")
-            hist_fig.update_layout(xaxis_tickformat=".1%")
-            hist_fig.update_layout(xaxis_tickangle=-45)
-        histograms.append(dbc.Col(dcc.Graph(figure=hist_fig), width=6))
+            bar_fig.update_layout(xaxis_title="Proportion")
+            bar_fig.update_layout(xaxis_tickformat=".1%")
+            bar_fig.update_layout(xaxis_tickangle=-45)
+        bars.append(dbc.Col(dcc.Graph(figure=bar_fig), width=6))
 
-    global_hist_fig = px.bar(
-        dfg,
+    global_data = df.groupby('event').agg({'event': 'count'}).rename(columns={'event': 'count'})
+    global_data['proportion'] = global_data['count'] / global_data['count'].sum()
+    global_data['proportion'] = global_data['proportion'].apply(lambda x: round(x, 3))
+    global_data = global_data.reset_index()
+    global_data = global_data.sort_values(by=scale, ascending=False)
+    global_bar_fig = px.bar(
+        global_data,
         x=scale,
         y='event',
         color='event',
@@ -236,18 +244,18 @@ def render_driver_event_container(start_date, end_date, drivers, events, scale):
         color_discrete_map=event_colors,
         orientation='h'
     )
-    global_hist_fig.update_layout(xaxis_type="log")
-    global_hist_fig.update_layout(showlegend=False)
+    global_bar_fig.update_layout(showlegend=False)
+    global_bar_fig.update_layout(xaxis_type="log")
     if scale == 'count':
-        global_hist_fig.update_layout(yaxis_title="Event Count")
+        global_bar_fig.update_layout(yaxis_title="Event Count")
     if scale == 'proportion':
-        global_hist_fig.update_layout(xaxis_title="Proportion")
-        global_hist_fig.update_layout(xaxis_tickformat=".1%")
+        global_bar_fig.update_layout(xaxis_title="Proportion")
+        global_bar_fig.update_layout(xaxis_tickformat=".1%")
 
-    histograms.append(dbc.Col(dcc.Graph(figure=global_hist_fig), width=12))
+    bars.append(dbc.Col(dcc.Graph(figure=global_bar_fig), width=12))
 
     return dcc.Loading([
-        dbc.Row(histograms),
+        dbc.Row(bars),
         grid
     ], type='circle')
 
