@@ -154,8 +154,9 @@ def render_manager_event_container(start_date, end_date, managers, events, scale
     if scale == 'count':
         global_bar_fig.update_layout(yaxis_title="Event Count")
     if scale == 'proportion':
-        global_bar_fig.update_layout(xaxis_title="Proportion")
+        global_bar_fig.update_layout(xaxis_title="Event Proportion")
         global_bar_fig.update_layout(xaxis_tickformat=".1%")
+        global_bar_fig.update_layout(xaxis_tickangle=-45)
 
     bars.append(dbc.Col(dcc.Graph(figure=global_bar_fig), width=12))
 
@@ -249,8 +250,9 @@ def render_driver_event_container(start_date, end_date, drivers, events, scale):
     if scale == 'count':
         global_bar_fig.update_layout(yaxis_title="Event Count")
     if scale == 'proportion':
-        global_bar_fig.update_layout(xaxis_title="Proportion")
+        global_bar_fig.update_layout(xaxis_title="Event Proportion")
         global_bar_fig.update_layout(xaxis_tickformat=".1%")
+        global_bar_fig.update_layout(xaxis_tickangle=-45)
 
     bars.append(dbc.Col(dcc.Graph(figure=global_bar_fig), width=12))
 
