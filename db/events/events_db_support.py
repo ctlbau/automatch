@@ -5,7 +5,13 @@ from datetime import datetime, timedelta
 from db.db_connect import localauth_dev, localauth_stg, localauth_prod, connect, kndauth
 import math
 
-database = kndauth
+app_env = os.getenv("APP_ENV", "dev")
+if app_env == 'stg':
+    database = localauth_stg
+elif app_env == 'dev':
+    database = localauth_dev
+else:
+    database = localauth_prod
 
 def fetch_driver_events_by_period_for_managers(start_date, end_date, managers=None):
     engine = connect(kndauth)
@@ -105,7 +111,6 @@ def get_min_max_dates_from_schedule_events():
     return df.iloc[0]['min_date'], df.iloc[0]['max_date']
 
 def fetch_managers():
-    database = localauth_dev
     engine = connect(database)
     query = text("SELECT id, name FROM Managers;")
     managers_df = pd.read_sql(query, engine)
