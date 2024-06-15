@@ -111,14 +111,24 @@ def get_min_max_dates_from_schedule_events():
     return df.iloc[0]['min_date'], df.iloc[0]['max_date']
 
 def fetch_managers():
-    engine = connect(database)
-    query = text("SELECT id, name FROM Managers;")
-    managers_df = pd.read_sql(query, engine)
-    managers_df = managers_df.sort_values(by='name')
+    engine = connect(kndauth)
+    query = """
+        SELECT DISTINCT
+            e2.id,
+            CONCAT(e2.first_name, ' ', e2.last_name) AS name
+        FROM 
+            employee e
+        JOIN employee e2 ON e.fleet_manager_id = e2.id
+        WHERE 
+            e2.status = 'active'
+        ORDER BY 
+            name
+    """
+    managers_df = pd.read_sql(text(query), engine)
     return managers_df
 
 def fetch_event_options():
-    engine = connect(database)
+    engine = connect(kndauth)
     query = text("SELECT DISTINCT name FROM schedule_event_type;")
     events_df = pd.read_sql(query, engine)
     return events_df
