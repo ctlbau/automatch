@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from sqlalchemy import text
+from sqlalchemy import text, bindparam
 from datetime import datetime, timedelta
 from db.db_connect import localauth_dev, localauth_stg, localauth_prod, connect, kndauth
 import math
@@ -50,9 +50,10 @@ def fetch_driver_events_by_period_for_managers(start_date, end_date, managers=No
     
     if managers and managers != ['all']:
         query += " AND CONCAT(e2.first_name, ' ', e2.last_name) IN :managers"
-        params['managers'] = tuple(managers)
-    
-    query = text(query)
+        query = text(query).bindparams(bindparam('managers', expanding=True))
+        params['managers'] = managers
+    else:
+        query = text(query)
     
     df = pd.read_sql(query, engine, params=params)
     
@@ -96,9 +97,10 @@ def fetch_driver_events_by_period_for_drivers(start_date, end_date, drivers=None
     
     if drivers and drivers != ['all']:
         query += " AND e.id IN :drivers"
-        params['drivers'] = tuple(drivers)
-    
-    query = text(query)
+        query = text(query).bindparams(bindparam('drivers', expanding=True))
+        params['drivers'] = drivers
+    else:
+        query = text(query)
     
     df = pd.read_sql(query, engine, params=params)
     

@@ -55,18 +55,20 @@ def render_content(tab):
             dbc.Row([
                 dbc.Col([
                     create_date_range_picker('event-date-range-picker', min_date, max_date),
-                    dcc.Loading(create_dropdown('employee-dropdown', options=[], label='name', value='id', placeholder='Select driver', multi=True, add_all=False), type='circle'),
+                    create_dropdown('employee-dropdown', options=[], label='name', value='id', placeholder='Select driver', multi=True, add_all=False),
                     create_dropdown('event-dropdown', options=event_options, label='name', value='name', placeholder='Select event', multi=True, add_all=False),
-                    dcc.RadioItems(
-                        id='scale-toggle',
-                        options=[
-                            {'label': 'Counts', 'value': 'count'},
-                            {'label': 'Proportional', 'value': 'proportion'}
-                        ],
-                        value='count',
-                        labelStyle={'display': 'inline-block'},
-                        className="col-md-4 offset-md-4 col-12"
-                    ),
+                    dbc.Row([
+                        dbc.Col(dcc.RadioItems(
+                            id='scale-toggle',
+                            options=[
+                                {'label': 'Counts', 'value': 'count'},
+                                {'label': 'Proportional', 'value': 'proportion'}
+                            ],
+                            value='count',
+                            labelStyle={'display': 'inline-block'}
+                        ), className="col-md-4 offset-md-4 col-12"),
+                        dbc.Col(html.Button("Submit", id="driver-submit-button"), className="col-md-4 offset-md-4 col-12")
+                    ], className="mb-3"),
                     dcc.Loading(html.Div(id='driver-event-container', children=[], style={'width': '100%'}), type='circle'),
                 ])
             ])
@@ -92,12 +94,12 @@ def render_manager_event_container(start_date, end_date, managers, events, scale
         return html.Div()
     df = fetch_driver_events_by_period_for_managers(start_date, end_date, managers)
     if df.empty:
-        return html.Div()
+        return dbc.Alert("No events found for the selected period and drivers.", color="warning")
     if events:
         df = df[df['event'].isin(events)]
     df = expand_events(df)
     df['week'] = df['date'].dt.isocalendar().week
-    df = df[(df['start'] >= start_date) & (df['end'] <= end_date)]
+    df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
     total_event_col = df.groupby('manager').size().reset_index(name='total_manager_event_count')
     df = df.merge(total_event_col, on='manager', how='left')
     dfg = df.groupby(['manager', 'event']).agg({'event': 'count'}).rename(columns={'event': 'count'}).reset_index()
@@ -133,100 +135,94 @@ def render_manager_event_container(start_date, end_date, managers, events, scale
         dbc.Row(sorted_bars),
     ], type='circle')
 
-
 @callback(
     Output('driver-event-container', 'children'),
-    Input('event-date-range-picker', 'start_date'),
-    Input('event-date-range-picker', 'end_date'),
-    Input('employee-dropdown', 'value'),
-    Input('event-dropdown', 'value'),
-    Input('scale-toggle', 'value'),
+    State('event-date-range-picker', 'start_date'),
+    State('event-date-range-picker', 'end_date'),
+    State('employee-dropdown', 'value'),
+    State('event-dropdown', 'value'),
+    State('scale-toggle', 'value'),
+    Input('driver-submit-button', 'n_clicks'),
     prevent_initial_callback=True
 )
-def render_driver_event_container(start_date, end_date, drivers, events, scale):
+def render_driver_event_container(start_date, end_date, drivers, events, scale, n_clicks):
     if not drivers:
         return html.Div()
     if 'all' in drivers:
         drivers = None
+    if n_clicks is None:
+        return html.Div()
+    
     df = fetch_driver_events_by_period_for_drivers(start_date, end_date, drivers)
     if df.empty:
-        return html.Div()
+        return dbc.Alert("No events found for the selected period and drivers.", color="warning")
+    
     if events:
         df = df[df['event'].isin(events)]
-    df = expand_events(df)
-    df['week'] = df['date'].dt.isocalendar().week
-    df = df[(df['start'] >= start_date) & (df['end'] <= end_date)]
-    start_week = df['week'].min()
-    end_week = df['week'].max()
-    total_col = df.groupby('week').size().reset_index(name='total_count')
-    dfg = df.groupby(['week', 'event']).agg({'event': 'count'}).rename(columns={'event': 'count'})
-    dfg.reset_index(inplace=True)
-    dfg = pd.merge(dfg, total_col, on=['week'], how='left')
-    dfg['proportion'] = dfg['count'] / dfg['total_count']
-    dfg['proportion'] = dfg['proportion'].apply(lambda x: round(x, 3))
-    dfg = dfg.sort_values(by=scale, ascending=False)
-    pivot = dfg.pivot(index=['event'], columns=['week'], values=scale).fillna(0.000)
-    pivot = pivot.reset_index()
-    page_size = len(pivot)
     
-    if scale == 'count':
-        numeric_cols = pivot.select_dtypes(include='number').columns
-        pivot['Total'] = pivot[numeric_cols].sum(axis=1)
-
-    grid = create_data_table('events-table', pivot, 'events.csv', page_size=page_size)
-
-    color_map = px.colors.qualitative.Plotly
-    event_colors = {event: color_map[i % len(color_map)] for i, event in enumerate(dfg['event'].unique())}
-
-    bars = []
-    for week in range(start_week, end_week + 1):
-        week_data = dfg[dfg['week'] == week]
-        bar_fig = px.bar(
-            week_data,
+    df = expand_events(df)
+    df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+    
+    driver_bars = []
+    for driver in df['employee'].unique():
+        driver_data = df[df['employee'] == driver]
+        
+        # Weekly aggregation
+        total_event_col = driver_data.groupby('week').size().reset_index(name='total_event_count')
+        dfg = driver_data.groupby(['week', 'event']).agg({'event': 'count'}).rename(columns={'event': 'count'}).reset_index()
+        dfg = pd.merge(dfg, total_event_col, on=['week'], how='left')
+        dfg['proportion'] = dfg['count'] / dfg['total_event_count']
+        dfg['proportion'] = dfg['proportion'].apply(lambda x: round(x, 3))
+        dfg = dfg.sort_values(by=['week', scale], ascending=[True, False])
+        
+        # Weekly bar graphs
+        for week in dfg['week'].unique():
+            week_data = dfg[dfg['week'] == week]
+            if week_data.empty:
+                continue
+            bar_fig = px.bar(
+                week_data,
+                x=scale,
+                y='event', 
+                color='event',
+                title=f'{driver} - Week {week}',
+                orientation='h'
+            )
+            bar_fig.update_layout(showlegend=False)
+            bar_fig.update_layout(xaxis_type="log")
+            if scale == 'proportion':
+                bar_fig.update_layout(xaxis_tickformat=".1%")
+                bar_fig.update_layout(xaxis_tickangle=-45)
+            driver_bars.append(dbc.Col(dcc.Graph(figure=bar_fig), width=6))
+        
+        # Global aggregation
+        global_data = driver_data.groupby('event').agg({'event': 'count'}).rename(columns={'event': 'count'})
+        global_data['proportion'] = global_data['count'] / global_data['count'].sum()
+        global_data['proportion'] = global_data['proportion'].apply(lambda x: round(x, 3))
+        global_data = global_data.reset_index()
+        global_data = global_data.sort_values(by=scale, ascending=False)
+        
+        # Global bar graph
+        global_bar_fig = px.bar(
+            global_data,
             x=scale,
-            y='event', 
+            y='event',
             color='event',
-            title=f'Event Distribution for Week {week}',
-            color_discrete_map=event_colors,
+            title=f'{driver} - Event Distribution from {start_date} to {end_date}',
             orientation='h'
         )
-        bar_fig.update_layout(showlegend=False)
-        bar_fig.update_layout(yaxis_title="Events")
-        bar_fig.update_layout(xaxis_type="log")
+        global_bar_fig.update_layout(showlegend=False)
+        global_bar_fig.update_layout(xaxis_type="log")
+        if scale == 'count':
+            global_bar_fig.update_layout(yaxis_title="Event Count")
         if scale == 'proportion':
-            bar_fig.update_layout(xaxis_title="Proportion")
-            bar_fig.update_layout(xaxis_tickformat=".1%")
-            bar_fig.update_layout(xaxis_tickangle=-45)
-        bars.append(dbc.Col(dcc.Graph(figure=bar_fig), width=6))
-
-    global_data = df.groupby('event').agg({'event': 'count'}).rename(columns={'event': 'count'})
-    global_data['proportion'] = global_data['count'] / global_data['count'].sum()
-    global_data['proportion'] = global_data['proportion'].apply(lambda x: round(x, 3))
-    global_data = global_data.reset_index()
-    global_data = global_data.sort_values(by=scale, ascending=False)
-    global_bar_fig = px.bar(
-        global_data,
-        x=scale,
-        y='event',
-        color='event',
-        title=f'Global Event Distribution between {start_date} and {end_date}',
-        color_discrete_map=event_colors,
-        orientation='h'
-    )
-    global_bar_fig.update_layout(showlegend=False)
-    global_bar_fig.update_layout(xaxis_type="log")
-    if scale == 'count':
-        global_bar_fig.update_layout(yaxis_title="Event Count")
-    if scale == 'proportion':
-        global_bar_fig.update_layout(xaxis_title="Event Proportion")
-        global_bar_fig.update_layout(xaxis_tickformat=".1%")
-        global_bar_fig.update_layout(xaxis_tickangle=-45)
-
-    bars.append(dbc.Col(dcc.Graph(figure=global_bar_fig), width=12))
-
+            global_bar_fig.update_layout(xaxis_title="Event Proportion")
+            global_bar_fig.update_layout(xaxis_tickformat=".1%")
+            global_bar_fig.update_layout(xaxis_tickangle=-45)
+        driver_bars.append(dbc.Col(dcc.Graph(figure=global_bar_fig), width=12))
+    
     return dcc.Loading([
-        dbc.Row(bars),
-        grid
+        dbc.Row(driver_bars),
     ], type='circle')
 
 @callback(
@@ -241,5 +237,4 @@ def update_driver_options(start_date, end_date):
     df.sort_values(by='name', inplace=True)
     driver_options = df.to_dict('records')
     driver_options = [{'label': driver['name'], 'value': driver['id']} for driver in driver_options]
-    driver_options.insert(0, {'label': 'All drivers', 'value': 'all'})
     return driver_options
