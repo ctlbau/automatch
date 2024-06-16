@@ -265,7 +265,7 @@ def expand_event_days(row):
         return expanded_rows
     
     num_days = math.ceil((end - start).total_seconds() / (24 * 3600))
-    for day in range(num_days):
+    for day in range(num_days + 1):
         new_row = row._asdict()
         new_row['date'] = start + timedelta(days=day)
         expanded_rows.append(new_row)
