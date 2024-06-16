@@ -107,6 +107,9 @@ def render_manager_event_container(start_date, end_date, managers, events, scale
     dfg['proportion'] = dfg['count'] / dfg['total_manager_event_count']
     dfg['proportion'] = dfg['proportion'].apply(lambda x: round(x, 3))
     dfg = dfg.sort_values(by=scale, ascending=False)
+
+    color_map = px.colors.qualitative.Plotly
+    event_colors = {event: color_map[i % len(color_map)] for i, event in enumerate(dfg['event'].unique())}
     
     manager_bars = []
     managers = dfg['manager'].unique()
@@ -118,6 +121,7 @@ def render_manager_event_container(start_date, end_date, managers, events, scale
             x=scale,
             y='event', 
             color='event',
+            color_discrete_map=event_colors,
             title=f'{manager}<br><sub>{n_drivers} drivers between {start_date} and {end_date}</sub>',
             orientation='h'
         )
@@ -162,6 +166,9 @@ def render_driver_event_container(start_date, end_date, drivers, events, scale, 
     
     df = expand_events(df)
     df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+
+    color_map = px.colors.qualitative.Plotly
+    event_colors = {event: color_map[i % len(color_map)] for i, event in enumerate(df['event'].unique())}
     
     driver_bars = []
     for driver in df['employee'].unique():
@@ -185,6 +192,7 @@ def render_driver_event_container(start_date, end_date, drivers, events, scale, 
                 x=scale,
                 y='event', 
                 color='event',
+                color_discrete_map=event_colors,
                 title=f'{driver} - Week {week}',
                 orientation='h'
             )
@@ -208,6 +216,7 @@ def render_driver_event_container(start_date, end_date, drivers, events, scale, 
             x=scale,
             y='event',
             color='event',
+            color_discrete_map=event_colors,
             title=f'{driver} - Event Distribution from {start_date} to {end_date}',
             orientation='h'
         )
