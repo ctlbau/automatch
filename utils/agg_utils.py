@@ -1,6 +1,6 @@
 import pandas as pd
 import math
-from datetime import timedelta
+from datetime import timedelta, date, datetime
 
 def calculate_aggregations(base_df, group_columns):
     grouped_data = base_df.groupby(group_columns).agg({'kendra_id': list}).reset_index()
@@ -265,15 +265,16 @@ def expand_event_days(row):
         return expanded_rows
     
     num_days = math.ceil((end - start).total_seconds() / (24 * 3600))
-    for day in range(num_days + 1):
+    for day in range(num_days):
         new_row = row._asdict()
-        new_row['date'] = start + timedelta(days=day)
+        new_row['date'] = start + timedelta(days=day)  # Keep as datetime for now
         expanded_rows.append(new_row)
     return expanded_rows
 
 def expand_events(df):
     expanded_df = pd.DataFrame([day for row in df.itertuples(index=False) for day in expand_event_days(row)])
     expanded_df = expanded_df.sort_values(by=['date'])
+    expanded_df['date'] = pd.to_datetime(expanded_df['date'])
     expanded_df['week'] = expanded_df['date'].dt.isocalendar().week
-    expanded_df.dropna(inplace=True)
+    expanded_df['date'] = expanded_df['date'].dt.date
     return expanded_df

@@ -62,6 +62,7 @@ def fetch_driver_events_by_period_for_managers(start_date, end_date, managers=No
 def fetch_driver_events_by_period_for_drivers(start_date, end_date, drivers=None):
     engine = connect(kndauth)
     start_date = pd.to_datetime(start_date)
+    start_date = start_date.replace(hour=0, minute=0, second=0)
     end_date = pd.to_datetime(end_date)
     end_date = end_date.replace(hour=23, minute=59, second=59)
     

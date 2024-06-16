@@ -7,6 +7,7 @@ import plotly.express as px
 from db.events import fetch_managers, get_min_max_dates_from_schedule_events, fetch_driver_events_by_period_for_managers, fetch_driver_events_by_period_for_drivers, fetch_event_options, fetch_employees_in_schedule_event
 from ui.components import create_data_table, create_modal, create_dropdown, create_date_range_picker
 from utils.agg_utils import expand_events
+from datetime import date
 
 dash.register_page(__name__, path='/events')
 
@@ -98,8 +99,7 @@ def render_manager_event_container(start_date, end_date, managers, events, scale
     if events:
         df = df[df['event'].isin(events)]
     df = expand_events(df)
-    df['week'] = df['date'].dt.isocalendar().week
-    df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+    df = df[(df['date'] >= pd.to_datetime(start_date).date()) & (df['date'] <= pd.to_datetime(end_date).date())]
     total_event_col = df.groupby('manager').size().reset_index(name='total_manager_event_count')
     df = df.merge(total_event_col, on='manager', how='left')
     dfg = df.groupby(['manager', 'event']).agg({'event': 'count'}).rename(columns={'event': 'count'}).reset_index()
@@ -165,7 +165,7 @@ def render_driver_event_container(start_date, end_date, drivers, events, scale, 
         df = df[df['event'].isin(events)]
     
     df = expand_events(df)
-    df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+    df = df[(df['date'] >= pd.to_datetime(start_date).date()) & (df['date'] <= pd.to_datetime(end_date).date())]
 
     color_map = px.colors.qualitative.Plotly
     event_colors = {event: color_map[i % len(color_map)] for i, event in enumerate(df['event'].unique())}
