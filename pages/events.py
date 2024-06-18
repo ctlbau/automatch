@@ -122,8 +122,6 @@ def render_event_manager_container(start_date, end_date, managers, events, scale
     if n_clicks is None:
         return html.Div()
     df = fetch_driver_events_by_period_for_managers(start_date, end_date, managers)
-    if events:
-        df = df[df['event'].isin(events)]
     if df.empty:
         return dbc.Alert("No events found for the selected period and drivers.", color="warning")
     df = expand_events(df)
@@ -135,6 +133,8 @@ def render_event_manager_container(start_date, end_date, managers, events, scale
     merged_df['proportion'] = (merged_df['count'] / merged_df['total_events']) * 100
     merged_df['proportion'] = merged_df['proportion'].apply(lambda x: round(x, 3))
     merged_df = merged_df.sort_values(by=scale, ascending=False)
+    if events:
+        merged_df = merged_df[merged_df['event'].isin(events)]
     pivot_df = merged_df.pivot(index='manager', columns='event', values=scale).reset_index().fillna(0)
     page_size = len(pivot_df)
     grid = create_data_table('event-manager-table', pivot_df, 'event_manager_table.csv', page_size=page_size)
