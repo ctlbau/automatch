@@ -261,27 +261,6 @@ def render_driver_event_container(start_date, end_date, drivers, events, scale, 
         dfg['proportion'] = dfg['proportion'].apply(lambda x: round(x, 3))
         dfg = dfg.sort_values(by=['week', scale], ascending=[True, False])
         
-        # Weekly bar graphs
-        for week in dfg['week'].unique():
-            week_data = dfg[dfg['week'] == week]
-            if week_data.empty:
-                continue
-            bar_fig = px.bar(
-                week_data,
-                x=scale,
-                y='event', 
-                color='event',
-                color_discrete_map=event_colors,
-                title=f'{driver} - Week {week}',
-                orientation='h'
-            )
-            bar_fig.update_layout(showlegend=False)
-            bar_fig.update_layout(xaxis_type="log")
-            if scale == 'proportion':
-                bar_fig.update_layout(xaxis_tickformat=".1%")
-                bar_fig.update_layout(xaxis_tickangle=-45)
-            driver_bars.append(dbc.Col(dcc.Graph(figure=bar_fig), width=6))
-        
         # Global aggregation
         global_data = driver_data.groupby('event').agg({'event': 'count'}).rename(columns={'event': 'count'})
         global_data['proportion'] = global_data['count'] / global_data['count'].sum()
