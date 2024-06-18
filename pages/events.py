@@ -15,6 +15,7 @@ layout = html.Div([
     dcc.Tabs(id="event-tabs", value='manager-event-tab', children=[
         dcc.Tab(label='Manager View', value='manager-event-tab'),
         dcc.Tab(label='Driver View', value='driver-event-tab'),
+        dcc.Tab(label='Event View', value='event-event-tab'),
     ], className="col-md-3 offset-md-1 col-12"),
     html.Div(id='event-tabs-content')
 ])
@@ -22,11 +23,11 @@ layout = html.Div([
 @callback(Output('event-tabs-content', 'children'),
           Input('event-tabs', 'value'))
 def render_content(tab):
-    if tab == 'manager-event-tab':
+    if tab == 'event-event-tab':
         min_date, max_date = get_min_max_dates_from_schedule_events()
         manager_options = fetch_managers().to_dict('records')
         event_options = fetch_event_options().to_dict('records')
-        manager_layout = dbc.Container([
+        event_layout = dbc.Container([
             dbc.Row([
                 dbc.Col([
                     create_date_range_picker('event-date-range-picker', min_date, max_date),
@@ -42,13 +43,13 @@ def render_content(tab):
                             value='count',
                             labelStyle={'display': 'inline-block'}
                         ), className="col-md-4 offset-md-4 col-12"),
-                        dbc.Col(html.Button("Submit", id="manager-submit-button"), className="col-md-4 offset-md-4 col-12")
+                        dbc.Col(html.Button("Submit", id="event-submit-button"), className="col-md-4 offset-md-4 col-12")
                     ], className="mb-3"),
-                    dcc.Loading(html.Div(id='manager-event-container', children=[], style={'width': '100%'}), type='circle'),
+                    dcc.Loading(html.Div(id='event-event-container', children=[], style={'width': '100%'}), type='circle'),
                 ])
             ])
         ])
-        return manager_layout
+        return event_layout
     elif tab == 'driver-event-tab':
         min_date, max_date = get_min_max_dates_from_schedule_events()
         event_options = fetch_event_options().to_dict('records') 
@@ -75,15 +76,93 @@ def render_content(tab):
             ])
         ])
         return driver_layout
+    else:
+        min_date, max_date = get_min_max_dates_from_schedule_events()
+        manager_options = fetch_managers().to_dict('records')
+        event_options = fetch_event_options().to_dict('records')
+        manager_layout = dbc.Container([
+            dbc.Row([
+                dbc.Col([
+                    create_date_range_picker('event-date-range-picker', min_date, max_date),
+                    create_dropdown('man-event-dropdown', options=manager_options, label='name', value='name', placeholder='Select manager', multi=True, add_all=True),
+                    create_dropdown('event-dropdown', options=event_options, label='name', value='name', placeholder='Select event', multi=True, add_all=False),
+                    dbc.Row([
+                        dbc.Col(dcc.RadioItems(
+                            id='scale-toggle',
+                            options=[
+                                {'label': 'Counts', 'value': 'count'},
+                                {'label': 'Proportional', 'value': 'proportion'}
+                            ],
+                            value='proportion',
+                            labelStyle={'display': 'inline-block'}
+                        ), className="col-md-4 offset-md-4 col-12"),
+                        dbc.Col(html.Button("Submit", id="manager-submit-button"), className="col-md-4 offset-md-4 col-12")
+                    ], className="mb-3"),
+                    dcc.Loading(html.Div(id='event-manager-container', children=[], style={'width': '100%'}), type='circle'),
+                ])
+            ])
+        ])
+        return manager_layout
 
 @callback(
-    Output('manager-event-container', 'children'),
+    Output('event-manager-container', 'children'),
+    State('event-date-range-picker', 'start_date'),
+    State('event-date-range-picker', 'end_date'),
+    State('man-event-dropdown', 'value'),
+    State('event-dropdown', 'value'),
+    State('scale-toggle', 'value'),
+    Input('manager-submit-button', 'n_clicks'),
+    prevent_initial_callback=True
+)
+def render_event_manager_container(start_date, end_date, managers, events, scale, n_clicks):
+    if not managers:
+        return html.Div()
+    if 'all' in managers:
+        managers = None
+    if n_clicks is None:
+        return html.Div()
+    df = fetch_driver_events_by_period_for_managers(start_date, end_date, managers)
+    if events:
+        df = df[df['event'].isin(events)]
+    if df.empty:
+        return dbc.Alert("No events found for the selected period and drivers.", color="warning")
+    df = expand_events(df)
+    df = df[(df['date'] >= pd.to_datetime(start_date).date()) & (df['date'] <= pd.to_datetime(end_date).date())]
+
+    total_events_per_manager = df.groupby('manager')['id'].count().reset_index(name='total_events')
+    event_counts_per_manager = df.groupby(['manager', 'event'])['id'].count().reset_index(name='count')
+    merged_df = pd.merge(event_counts_per_manager, total_events_per_manager, on='manager')
+    merged_df['proportion'] = (merged_df['count'] / merged_df['total_events']) * 100
+    merged_df['proportion'] = merged_df['proportion'].apply(lambda x: round(x, 3))
+    merged_df = merged_df.sort_values(by=scale, ascending=False)
+    pivot_df = merged_df.pivot(index='manager', columns='event', values=scale).reset_index().fillna(0)
+    page_size = len(pivot_df)
+    grid = create_data_table('event-manager-table', pivot_df, 'event_manager_table.csv', page_size=page_size)
+    pivot_melted = pivot_df.melt(id_vars='manager', var_name='event', value_name=scale)
+    scale_cap = scale.capitalize()
+    fig = px.bar(pivot_melted, 
+             x='manager', 
+             y=scale, 
+             color='event', 
+             barmode='group',
+             title=f'{scale_cap} of Each Event Type per Manager')
+    fig.update_layout(showlegend=True)
+    if scale == 'proportion':
+        fig.update_layout(yaxis_tickformat='.1f%%')
+        fig.update_layout(xaxis_tickangle=-45)
+    else:
+        fig.update_layout(yaxis_type="log")
+    return [dcc.Graph(figure=fig), grid]
+
+
+@callback(
+    Output('event-event-container', 'children'),
     State('event-date-range-picker', 'start_date'),
     State('event-date-range-picker', 'end_date'),
     State('manager-dropdown', 'value'),
     State('event-dropdown', 'value'),
     State('scale-toggle', 'value'),
-    Input('manager-submit-button', 'n_clicks'),
+    Input('event-submit-button', 'n_clicks'),
     prevent_initial_callback=True
 )
 def render_manager_event_container(start_date, end_date, managers, events, scale, n_clicks):

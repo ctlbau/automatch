@@ -80,7 +80,7 @@ app.layout = dbc.Container([
             dbc.Col(
                 [
                     sidebar
-                ], xs=12, sm=12, md=2, lg=2, xl=2, xxl=2
+                ], xs=1, sm=1, md=2, lg=2, xl=2, xxl=2
             ),
             dbc.Col(
                 [
