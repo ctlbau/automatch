@@ -36,87 +36,69 @@ iso_tooltip={
         }
         }
 
-iso_layout = html.Div([
-    html.Div([
-        dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, style={'marginRight': '10px', 'width': '350px', 'display': 'block', 'marginBottom': '10px'}),
-        dcc.Dropdown(
-            id='province-dropdown',
-            options=[{'label': province['name'], 'value': province['id']} for province in fetch_provinces().to_dict('records')],
-            placeholder='Select a province',
-            multi=False,
-            # required=True, 
-            style={'marginRight': '10px', 'width': '350px', 'display': 'block', 'marginBottom': '10px'}
-        ),
-        html.Div([  # Div to wrap zip-code-input and Submit button
-            dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False, style={'marginRight': '10px', 'display': 'inline-block', 'marginBottom': '10px'}),
-            html.Button('Submit', id='submit-val', n_clicks=0, style={'display': 'inline-block'}),
-        ], style={'display': 'flex', 'flexDirection': 'row'}),
-        html.Label('Isochrone Limits (in minutes):', style={'display': 'block', 'marginBottom': '10px'}),
-        dcc.RangeSlider(
-            id='time-limit-range-slider',
-            min=5,
-            max=60,
-            step=5,
-            value=[5, 10],
-            marks={i: f'{i}' for i in range(5, 61, 5)},
-        ),
-        dcc.Dropdown(
-            id='shifts-dropdown',
-            options=[{'label': shift['name'], 'value': shift['name']} for shift in fetch_shifts().to_dict('records')],
-            placeholder='Select a shift',
-            multi=True,
-            style={'marginBottom': '10px'}
-        ),
-        dcc.Dropdown(
-            id='managers-dropdown',
-            options=[{'label': manager['name'], 'value': manager['name']} for manager in fetch_managers().to_dict('records')],
-            placeholder='Select a manager',
-            multi=True,
-            style={'marginBottom': '10px'}
-        ),
-        dcc.Dropdown(
-            id='center-dropdown',
-            options=[{'label': center['name'], 'value': center['name']} for center in fetch_centers().to_dict('records')],
-            placeholder='Select a center',
-            multi=True,
-            style={'marginBottom': '10px'}
-        ),
-        dcc.Dropdown(
-            id='exchange-locations-dropdown',
-            options=[{'label': exchange_location['name'], 'value': exchange_location['name']} for exchange_location in fetch_exchange_locations().to_dict('records')],
-            placeholder='Select an exchange location',
-            multi=True,
-            style={'marginBottom': '10px'}
-        ),
-        html.Div([  # Div for radio items to display horizontally
-            html.Label('Filter by Match Status:', style={'marginRight': '20px', 'marginBottom': '10px'}),
-            dcc.RadioItems(
-                id='is-matched-radio',
-                options=[
-                    {'label': 'All', 'value': 'all'},
-                    {'label': 'True', 'value': 'true'},
-                    {'label': 'False', 'value': 'false'},
-                ],
-                value='all',
-                labelStyle={'display': 'inline-block', 'marginRight': '20px'},  # Adjusted for horizontal display
-                style={'marginBottom': '10px'}
+iso_layout = dbc.Container([
+    dbc.Row([
+        dbc.Col([
+            # Centered input controls
+            dbc.Card([
+                dbc.CardBody([
+                    dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, className='form-control mb-3'),
+                    create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select a province', multi=False, class_name='mb-3'),
+                    dbc.Row([
+                        dbc.Col(dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False, className='form-control'), width=8),
+                        dbc.Col(dbc.Button('Submit', id='submit-val', n_clicks=0, color="primary"), width=4),
+                    ], className='mb-3'),
+                    html.Label('Isochrone Limits (in minutes):', className='mb-2'),
+                    dcc.RangeSlider(
+                        id='time-limit-range-slider',
+                        min=5, max=60, step=5, value=[5, 10],
+                        marks={i: f'{i}' for i in range(5, 61, 5)},
+                        className='mb-3'
+                    ),
+                    create_dropdown('shifts-dropdown', options=fetch_shifts().to_dict('records'), label='name', value='name', placeholder='Select a shift', multi=True, class_name='mb-3'),
+                    create_dropdown('managers-dropdown', options=fetch_managers().to_dict('records'), label='name', value='name', placeholder='Select a manager', multi=True, class_name='mb-3'),
+                    create_dropdown('center-dropdown', options=fetch_centers().to_dict('records'), label='name', value='name', placeholder='Select a center', multi=True, class_name='mb-3'),
+                    create_dropdown('exchange-locations-dropdown', options=fetch_exchange_locations().to_dict('records'), label='name', value='name', placeholder='Select an exchange location', multi=True, class_name='mb-3'),
+                    dbc.Row([
+                        dbc.Col(html.Label('Filter by Match Status:', className='mr-2'), width='auto'),
+                        dbc.Col(dcc.RadioItems(
+                            id='is-matched-radio',
+                            options=[
+                                {'label': 'All', 'value': 'all'},
+                                {'label': 'True', 'value': 'true'},
+                                {'label': 'False', 'value': 'false'},
+                            ],
+                            value='all',
+                            inline=True
+                        ), width='auto'),
+                    ], className='mb-3 align-items-center justify-content-center'),
+                ])
+            ], className='mb-4'),  # Added margin to the bottom of the card
+            
+            # Alert
+            dbc.Alert(
+                id="alert-fail-geoencode",
+                children="Unable to find location. Please check the address and zip code, then try again.",
+                color="danger",
+                dismissable=True,
+                is_open=False,
+                className='mb-3',
             ),
-        ], style={'display': 'flex', 'flexDirection': 'row', 'alignItems': 'center'}),
-    ], className="col-md-3 offset-md-0 col-12"),
-    
-    dbc.Alert(
-        id="alert-fail-geoencode",
-        children="Unable to find location. Please check the address and zip code, then try again.",
-        color="danger",
-        dismissable=True,
-        is_open=False,
-        style={'marginTop': '20px'},
-        ),
-    html.Div(create_map_container('isomatch-map', initial_view_coords=ATOCHA, tooltip_info=iso_tooltip, map_style=CHOSEN_STYLE), style={'width': '80%', 'position': 'relative', 'marginTop': '20px'}),
-    html.Div(id='data-tables-container', children=[], style={'width': '75%', 'position': 'relative', 'marginTop': '20px'}),  # Container for dynamic data tables
-], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'})  # This ensures vertical stacking and center alignment
+            
+            # Map
+            html.Div(
+                create_map_container('isomatch-map', initial_view_coords=ATOCHA, tooltip_info=iso_tooltip, map_style=CHOSEN_STYLE), 
+                style={'height': '500px', 'width': '100%'},
+                className='mb-3 map-wrapper'
+            ),
+            
+            # Data tables
+            html.Div(id='data-tables-container', children=[]),
+        ], width=12, lg=10, xl=8, className='px-0'),  # Adjusted width here and removed padding
+    ], justify='start', className='mx-0'),  # Changed to 'start' to align to the left and removed margin
+], fluid=True, className='mt-3 px-0')  # Removed horizontal padding
 
-stats_layout = html.Div([
+stats_layout = dbc.Container([
     dcc.Store(id='error-data-store'),
     create_modal("error-modal", "error-modal-title", "error-details-grid", "error-modal-footer"),
     create_dropdown(
@@ -127,23 +109,45 @@ stats_layout = html.Div([
         placeholder='Select an exchange location',
         multi=False,
         add_all=True,
-        class_name="col-md-4 offset-md-4 col-12"
-        ),
+        class_name="mb-3"
+    ),
     create_modal('manager-stats-modal', 'manager-stats-modal-title', 'manager-stats-modal-body', 'manager-stats-modal-footer'),
     dcc.Loading(
         id="loading-peak-container",
         type="circle",
         children=[
-            html.Div([
-                html.Div(id='stats-grid-container', children=[], style={'width': '79%', 'marginTop': '20px'}),
-                html.Div([
-                    html.Button("Show Errors", id="show-error-modal-btn", className="ml-auto", style={'display': 'inline-block', 'alignSelf': 'flex-start'}),
-                    html.Button("Download CSV", id="download-manager-stats-csv-btn", className="ml-auto", style={'display': 'inline-block', 'alignSelf': 'flex-end'}),
-                ], style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center', 'marginTop': '10px'}),
-            ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center', 'justifyContent': 'flex-end', 'height': '100%'}),
+            dbc.Row([
+                dbc.Col([
+                    html.Div(id='stats-grid-container', children=[]),
+                ], width=12, className='mb-3'),
+                dbc.Col([
+                    dbc.Button("Show Errors", id="show-error-modal-btn", color="secondary", className="mr-2"),
+                    dbc.Button("Download CSV", id="download-manager-stats-csv-btn", color="primary"),
+                ], width=12, className='d-flex justify-content-center'),
+            ]),
         ]
     ),
 ])
+
+layout = dbc.Container([
+    dbc.Tabs(id="tabs", active_tab='iso-tab', children=[
+        dbc.Tab(label='Isomatch', tab_id='iso-tab'),
+        dbc.Tab(label='Matchstats', tab_id='stats-tab'),
+    ], className="nav-fill w-100 mb-3"),
+    html.Div(id='isomatch-tabs-content', style={'height': 'calc(100vh - 100px)'})  # Adjust the 100px as needed
+], fluid=True, style={'height': '100vh', 'overflow-y': 'auto'})
+
+@callback(
+    Output('isomatch-tabs-content', 'children'),
+    Input('tabs', 'active_tab')
+)
+def render_content(tab):
+    if tab == 'iso-tab':
+        return iso_layout
+    elif tab == 'stats-tab':
+        return stats_layout
+    else:
+        return None
 
 @callback(
     Output('stats-grid-container', 'children'), 
@@ -210,27 +214,6 @@ def display_manager_details(cell, exchange_locations_options, exchange_locations
         else:
             return False, dash.no_update, dash.no_update
     return False, dash.no_update, dash.no_update
-
-
-layout = html.Div([
-    dcc.Tabs(id="tabs", value='iso-tab', children=[
-        dcc.Tab(label='Isomatch', value='iso-tab'),
-        dcc.Tab(label='Matchstats', value='stats-tab'),
-    ], className="col-md-3 offset-md-1 col-12"),
-    html.Div(id='isomatch-tabs-content')
-])
-
-@callback(
-        Output('isomatch-tabs-content', 'children'),
-        Input('tabs', 'value')
-)
-def render_content(tab):
-    if tab == 'iso-tab':
-        return iso_layout
-    elif tab == 'stats-tab':
-        return stats_layout
-    else:
-        return None
 
 
 @callback(
@@ -410,3 +393,11 @@ def download_csv(n_clicks):
         return True
     return dash.no_update
 
+@callback(
+    Output('isomatch-map', 'style'),
+    Input('tabs', 'active_tab')
+)
+def resize_map(active_tab):
+    if active_tab == 'iso-tab':
+        return {'width': '100%', 'height': '100%'}
+    return {'width': '100%', 'height': '0'}  # Hide map on other tabs

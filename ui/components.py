@@ -14,31 +14,32 @@ import pandas as pd
 ATOCHA = (-3.690633, 40.406785)
 MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
 MAPBOX_API_KEY = os.getenv("MAPBOX_TOKEN")
+
 def create_map_container(id, initial_view_coords=ATOCHA, tooltip_info={}, map_style=MAP_STYLES[0]):
-        return dcc.Loading(
-                id="loading-map", 
-                children=[
-                    html.Div(
-                        DeckGL(
-                            id=id,
-                            data=pdk.Deck(
-                                initial_view_state=pdk.ViewState(
-                                    longitude=initial_view_coords[0],
-                                    latitude=initial_view_coords[1],
-                                    zoom=5,
-                                    pitch=0,
-                                    ),
-                                layers=[],
-                                map_style=map_style,                            
-                            ).to_json(),
-                            mapboxKey=MAPBOX_API_KEY,
-                            tooltip=tooltip_info
+    return dcc.Loading(
+        id=f"loading-{id}", 
+        children=[
+            html.Div(
+                DeckGL(
+                    id=id,
+                    data=pdk.Deck(
+                        initial_view_state=pdk.ViewState(
+                            longitude=initial_view_coords[0],
+                            latitude=initial_view_coords[1],
+                            zoom=5,
+                            pitch=0,
                         ),
-                        style={'height': '50vh', 'width': '100%'}  # Set the size of the map here
-                    )
-                ], 
-                type="circle"
+                        layers=[],
+                        map_style=map_style,                            
+                    ).to_json(),
+                    mapboxKey=MAPBOX_API_KEY,
+                    tooltip=tooltip_info
+                ),
+                style={'width': '100%', 'height': '100%'}  # Ensure it fills its container
             )
+        ], 
+        type="circle"
+    )
 
 
 def create_navbar(title):
@@ -218,29 +219,18 @@ def create_date_range_picker(id, min_date, max_date):
     )
 
 
-def create_dropdown(id, options, label='name', value='id', placeholder='Select an option', multi=False, add_all=False, class_name="col-md-4 offset-md-4 col-12"):
+def create_dropdown(id, options, label='name', value='id', placeholder='Select an option', multi=False, add_all=False, class_name=""):
     options = [{'label': option[label], 'value': ','.join(map(str, option[value])) if isinstance(option[value], list) else option[value]} for option in options]
     if add_all:
         options = [{'label': 'All', 'value': 'all'}] + options
-    return html.Nav(
-        className="navbar navbar-expand-lg mb-2",
-        children=[
-            html.Div(
-                className="container-fluid",
-                children=[
-                    html.Div(
-                        dcc.Dropdown(
-                            id=id,
-                            options=options,
-                            value=[],
-                            multi=multi,
-                            clearable=True,
-                            placeholder=placeholder,
-                        ), className=class_name,
-                    )
-                ]
-            )
-        ]
+    return dcc.Dropdown(
+        id=id,
+        options=options,
+        value=[],
+        multi=multi,
+        clearable=True,
+        placeholder=placeholder,
+        className=f'dash-dropdown {class_name}'
     )
 
 

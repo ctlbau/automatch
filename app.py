@@ -36,7 +36,7 @@ SIDEBAR_STYLE = {
     "top": 0,
     "left": 0,
     "bottom": 0,
-    "width": "18rem",
+    "width": "17rem",
     "padding": "2rem 1rem",
     "background-color": "#f8f9fa",
 }
@@ -72,25 +72,18 @@ sidebar = dbc.Nav(
     style=SIDEBAR_STYLE
 )
 
-app.layout = dbc.Container([
-    html.Br(),
-    dbc.Row(
-        [
-            dbc.Col(
-                [
-                    sidebar
-                ], xs=1, sm=1, md=2, lg=2, xl=2, xxl=2
-            ),
-            dbc.Col(
-                [
-                    dash.page_container
-                ], xs=12, sm=12, md=12, lg=12, xl=12, xxl=12
-            )
-        ],
-    )
-],
-fluid=True,
-)
+app.layout = html.Div([
+    dbc.Container([
+        dbc.Row([
+            dbc.Col([
+                sidebar
+            ], width=2, className="position-fixed"),  # Fixed position sidebar
+            dbc.Col([
+                html.Div(dash.page_container, style=CONTENT_STYLE)
+            ], width=10, className="offset-2")  # Main content, offset by sidebar width
+        ])
+    ], fluid=True)
+], style={"overflow-x": "hidden"})  # Prevent horizontal scrollbar
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8050)
