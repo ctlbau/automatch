@@ -30,7 +30,6 @@ auth = dash_auth.BasicAuth(
     USERS
 )
 
-
 # styling the sidebar
 SIDEBAR_STYLE = {
     "position": "fixed",
@@ -94,4 +93,4 @@ fluid=True,
 )
 
 if __name__ == '__main__':
-    app.run_server(debug=False, port=8050)
+    app.run_server(debug=True, port=8050)
