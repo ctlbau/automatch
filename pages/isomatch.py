@@ -39,26 +39,44 @@ iso_tooltip={
 iso_layout = dbc.Container([
     dbc.Row([
         dbc.Col([
-            # Centered input controls
             dbc.Card([
                 dbc.CardBody([
-                    dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, className='form-control mb-3'),
-                    create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select a province', multi=False, class_name='mb-3'),
                     dbc.Row([
-                        dbc.Col(dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False, className='form-control'), width=8),
-                        dbc.Col(dbc.Button('Submit', id='submit-val', n_clicks=0, color="primary"), width=4),
-                    ], className='mb-3'),
-                    html.Label('Isochrone Limits (in minutes):', className='mb-2'),
-                    dcc.RangeSlider(
-                        id='time-limit-range-slider',
-                        min=5, max=60, step=5, value=[5, 10],
-                        marks={i: f'{i}' for i in range(5, 61, 5)},
-                        className='mb-3'
-                    ),
-                    create_dropdown('shifts-dropdown', options=fetch_shifts().to_dict('records'), label='name', value='name', placeholder='Select a shift', multi=True, class_name='mb-3'),
-                    create_dropdown('managers-dropdown', options=fetch_managers().to_dict('records'), label='name', value='name', placeholder='Select a manager', multi=True, class_name='mb-3'),
-                    create_dropdown('center-dropdown', options=fetch_centers().to_dict('records'), label='name', value='name', placeholder='Select a center', multi=True, class_name='mb-3'),
-                    create_dropdown('exchange-locations-dropdown', options=fetch_exchange_locations().to_dict('records'), label='name', value='name', placeholder='Select an exchange location', multi=True, class_name='mb-3'),
+                        dbc.Col(dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, className='form-control mb-2'), width=12, lg=4),
+                    ]),
+                    dbc.Row([
+                        dbc.Col(create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select a province', multi=False, class_name='mb-2'), width=12, lg=4),
+                    ]),
+                    dbc.Row([
+                        dbc.Col(dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False, className='form-control'), width=12, lg=4),
+                    ], className='mb-2'),
+                    dbc.Row([
+                        dbc.Col(html.Label([
+                            'Isochrone Limits:',
+                            html.Br(),
+                            html.Span('(in minutes)', style={'fontSize': '0.8em', 'color': '#6c757d'})
+                        ], className='me-2 my-auto'), width=12, lg=1),
+                        dbc.Col(dcc.RangeSlider(
+                            id='time-limit-range-slider',
+                            min=5, max=60, step=5, value=[5, 10],
+                            marks={i: f'{i}' for i in range(5, 61, 5)},
+                        ), width=12, lg=3),
+                    ], className='g-0 align-items-center mb-3'),
+                    dbc.Row([
+                        dbc.Col(dbc.Button('Submit', id='submit-val', n_clicks=0, color="primary"), width=12, lg=4, className='mb-2'),
+                    ]),
+                    dbc.Row([
+                        dbc.Col(create_dropdown('shifts-dropdown', options=fetch_shifts().to_dict('records'), label='name', value='name', placeholder='Select a shift', multi=True, class_name='mb-3'), width=12, lg=4),
+                    ]),
+                    dbc.Row([
+                        dbc.Col(create_dropdown('managers-dropdown', options=fetch_managers().to_dict('records'), label='name', value='name', placeholder='Select a manager', multi=True, class_name='mb-3'), width=12, lg=4),
+                    ]),
+                    dbc.Row([
+                        dbc.Col(create_dropdown('center-dropdown', options=fetch_centers().to_dict('records'), label='name', value='name', placeholder='Select a center', multi=True, class_name='mb-3'), width=12, lg=4),
+                    ]),
+                    dbc.Row([
+                        dbc.Col(create_dropdown('exchange-locations-dropdown', options=fetch_exchange_locations().to_dict('records'), label='name', value='name', placeholder='Select an exchange location', multi=True, class_name='mb-3'), width=12, lg=4),
+                    ]),
                     dbc.Row([
                         dbc.Col(html.Label('Filter by Match Status:', className='mr-2'), width='auto'),
                         dbc.Col(dcc.RadioItems(
@@ -69,13 +87,12 @@ iso_layout = dbc.Container([
                                 {'label': 'False', 'value': 'false'},
                             ],
                             value='all',
-                            inline=True
+                            inline=True,
                         ), width='auto'),
-                    ], className='mb-3 align-items-center justify-content-center'),
-                ])
-            ], className='mb-4'),  # Added margin to the bottom of the card
+                    ], className='justify-content-start'),
+                ], className='px-2 py-2'),
+            ], className='mb-3'),
             
-            # Alert
             dbc.Alert(
                 id="alert-fail-geoencode",
                 children="Unable to find location. Please check the address and zip code, then try again.",
@@ -85,57 +102,78 @@ iso_layout = dbc.Container([
                 className='mb-3',
             ),
             
-            # Map
             html.Div(
                 create_map_container('isomatch-map', initial_view_coords=ATOCHA, tooltip_info=iso_tooltip, map_style=CHOSEN_STYLE), 
-                style={'height': '500px', 'width': '100%'},
+                style={'height': '600px', 'width': '100%'},
                 className='mb-3 map-wrapper'
             ),
             
-            # Data tables
             html.Div(id='data-tables-container', children=[]),
-        ], width=12, lg=10, xl=8, className='px-0'),  # Adjusted width here and removed padding
-    ], justify='start', className='mx-0'),  # Changed to 'start' to align to the left and removed margin
-], fluid=True, className='mt-3 px-0')  # Removed horizontal padding
+        ], width=12, lg=11, xl=11, className='px-3'),
+    ], justify='start', className='mx-0'),
+], fluid=True, className='mt-3 px-0')
 
 stats_layout = dbc.Container([
-    dcc.Store(id='error-data-store'),
-    create_modal("error-modal", "error-modal-title", "error-details-grid", "error-modal-footer"),
-    create_dropdown(
-        id='exchange-locations-dropdown',
-        options=fetch_exchange_locations().to_dict('records'),
-        label='name',
-        value='id',
-        placeholder='Select an exchange location',
-        multi=False,
-        add_all=True,
-        class_name="mb-3"
-    ),
-    create_modal('manager-stats-modal', 'manager-stats-modal-title', 'manager-stats-modal-body', 'manager-stats-modal-footer'),
-    dcc.Loading(
-        id="loading-peak-container",
-        type="circle",
-        children=[
-            dbc.Row([
-                dbc.Col([
-                    html.Div(id='stats-grid-container', children=[]),
-                ], width=12, className='mb-3'),
-                dbc.Col([
-                    dbc.Button("Show Errors", id="show-error-modal-btn", color="secondary", className="mr-2"),
-                    dbc.Button("Download CSV", id="download-manager-stats-csv-btn", color="primary"),
-                ], width=12, className='d-flex justify-content-center'),
-            ]),
-        ]
-    ),
-])
+    dbc.Row([
+        dbc.Col([
+            dcc.Store(id='error-data-store'),
+            create_modal("error-modal", "error-modal-title", "error-details-grid", "error-modal-footer"),
+            create_modal('manager-stats-modal', 'manager-stats-modal-title', 'manager-stats-modal-body', 'manager-stats-modal-footer'),
+            
+            dbc.Card([
+                dbc.CardBody([
+                    dbc.Row([
+                        dbc.Col(create_dropdown(
+                            id='exchange-locations-dropdown',
+                            options=fetch_exchange_locations().to_dict('records'),
+                            label='name',
+                            value='id',
+                            placeholder='Select an exchange location',
+                            multi=False,
+                            add_all=True,
+                            class_name="mb-3"
+                        ), width=12, md=8, lg=6, xl=4),
+                    ], justify="start"),
+                ], className='px-2 py-2'),
+            ], className='mb-3'),
+            
+            dcc.Loading(
+                id="loading-peak-container",
+                type="circle",
+                children=[
+                    html.Div(id='stats-grid-container', children=[], className='mb-3'),
+                    dbc.Collapse(
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Button("Show Errors", id="show-error-modal-btn", color="secondary", className="me-2"),
+                                dbc.Button("Download CSV", id="download-manager-stats-csv-btn", color="primary"),
+                            ], width="auto"),
+                        ], justify="center", className='mt-3'),
+                        id="button-collapse",
+                        is_open=False,
+                    ),
+                ]
+            ),
+        ], width=12, lg=11, xl=11, className='px-3'),
+    ], justify='center', className='mx-0'),
+], fluid=True, className='mt-3 px-0')
+
+@callback(
+    Output("content", "className"),
+    Input("sidebar-state", "data")
+)
+def adjust_content(sidebar_state):
+    if sidebar_state == "closed":
+        return "mt-3 px-3 content-expanded"
+    return "mt-3 px-3"
 
 layout = dbc.Container([
     dbc.Tabs(id="tabs", active_tab='iso-tab', children=[
         dbc.Tab(label='Isomatch', tab_id='iso-tab'),
         dbc.Tab(label='Matchstats', tab_id='stats-tab'),
     ], className="nav-fill w-100 mb-3"),
-    html.Div(id='isomatch-tabs-content', style={'height': 'calc(100vh - 100px)'})  # Adjust the 100px as needed
-], fluid=True, style={'height': '100vh', 'overflow-y': 'auto'})
+    html.Div(id='isomatch-tabs-content', style={'height': 'calc(100vh - 100px)'})
+], fluid=True, className='mt-3 px-3', id='content')
 
 @callback(
     Output('isomatch-tabs-content', 'children'),
@@ -152,21 +190,21 @@ def render_content(tab):
 @callback(
     Output('stats-grid-container', 'children'), 
     Output('error-data-store', 'data'),
+    Output('button-collapse', 'is_open'),
     Input('exchange-locations-dropdown', 'value'),
+    State('sidebar-state', 'data'),
     State('exchange-locations-dropdown', 'options'),
 )
-def update_stats_grid_and_graph(exchange_locations_id, exchange_locations_options):
+def update_stats_grid_and_graph(exchange_locations_id, sidebar_state, exchange_locations_options):
     if exchange_locations_id is not None:
         today = datetime.now().strftime("%Y-%m-%d")  
-        if exchange_locations_id == 0:  
-            # All exchange locations selected
+        if exchange_locations_id == 0:  # All exchange locations selected
             drivers_gdf, _ = fetch_drivers([28, 46, 8, 41, 29])  
             drivers_gdf_w_paths_and_distances, error_df = calculate_driver_distances_and_paths(drivers_gdf)
             drivers_gdf_w_paths_and_distances = drivers_gdf_w_paths_and_distances.dropna(subset=['distance'])
             fig = plot_distance_histogram(drivers_gdf_w_paths_and_distances)
             manager_stats = get_manager_distance_stats(drivers_gdf_w_paths_and_distances, "All")
             grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}.csv', page_size=20, custom_height='800px')
-            return [fig, grid], error_df.to_dict('records') if error_df is not None else None
         else:
             # Specific exchange location selected
             selected_option = next((option for option in exchange_locations_options if option['value'] == exchange_locations_id), None)
@@ -177,11 +215,18 @@ def update_stats_grid_and_graph(exchange_locations_id, exchange_locations_option
                 drivers_gdf_w_paths_and_distances = drivers_gdf_w_paths_and_distances.dropna(subset=['distance'])
                 fig = plot_distance_histogram(drivers_gdf_w_paths_and_distances)
                 manager_stats = get_manager_distance_stats(drivers_gdf_w_paths_and_distances, exchange_location)
+                manager_stats = manager_stats.drop(columns=['exchange_location'])
                 grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}_at_{exchange_location}.csv', page_size=20, custom_height='800px')
-                return [fig, grid], error_df.to_dict('records') if error_df is not None else None
             else:
-                return dash.no_update, dash.no_update
-    return dash.no_update, dash.no_update
+                return dash.no_update, dash.no_update, False
+
+        container_class = 'content-expanded' if sidebar_state == 'closed' else ''
+        return [
+            html.Div([fig, grid], className=container_class),
+            error_df.to_dict('records') if error_df is not None else None,
+            True
+        ]
+    return dash.no_update, dash.no_update, False  # Hide the buttons
 
 @callback(
     Output('manager-stats-modal', 'is_open'),

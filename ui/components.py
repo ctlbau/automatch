@@ -35,7 +35,7 @@ def create_map_container(id, initial_view_coords=ATOCHA, tooltip_info={}, map_st
                     mapboxKey=MAPBOX_API_KEY,
                     tooltip=tooltip_info
                 ),
-                style={'width': '100%', 'height': '100%'}  # Ensure it fills its container
+                style={'width': '100%', 'height': '100%'}
             )
         ], 
         type="circle"

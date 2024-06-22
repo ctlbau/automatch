@@ -1,6 +1,6 @@
 import dash
 import dash_bootstrap_components as dbc
-from dash import html
+from dash import html, dcc, callback, Input, Output, State, callback_context
 import dash_auth
 from dotenv import load_dotenv
 import os
@@ -13,77 +13,96 @@ load_dotenv(os.path.join(thisdir, '.env'))
 USERS = json.loads(os.getenv("USERS"))
 FLASK_KEY = os.getenv("FLASK_KEY")
 
-# Choose a theme from https://bootswatch.com/ or use the default Bootstrap theme
 server = Flask(__name__)
 server.secret_key = FLASK_KEY
 
 app = dash.Dash(
     __name__,
     server=server,
-    external_stylesheets=[dbc.themes.SPACELAB, 'https://codepen.io/chriddyp/pen/bWLwgP.css'],
+    external_stylesheets=[
+        dbc.themes.BOOTSTRAP,
+        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css'
+    ],
     use_pages=True,
     suppress_callback_exceptions=True
-                )
+)
 
 auth = dash_auth.BasicAuth(
     app,
     USERS
 )
 
-# styling the sidebar
-SIDEBAR_STYLE = {
-    "position": "fixed",
-    "top": 0,
-    "left": 0,
-    "bottom": 0,
-    "width": "17rem",
-    "padding": "2rem 1rem",
-    "background-color": "#f8f9fa",
-}
-
-# padding for the page content
-CONTENT_STYLE = {
-    "margin-left": "18rem",
-    "margin-right": "2rem",
-    "padding": "2rem 1rem",
-}
-
-sidebar_title = html.H2("AuroPulse", className="display-4")
-nav_links = [
-    dbc.NavLink(
-        [
-            html.Div(page["name"], className="ms-2")
-        ],
-        href=page["path"],
-        active="exact",
-    )
-    for page in dash.page_registry.values()
-]
-
-# Sidebar_title is wrapped in a list to allow concatenation with nav_links
-sidebar_content = [sidebar_title] + nav_links
-
-# Use sidebar_content as the children for dbc.Nav
-sidebar = dbc.Nav(
-    sidebar_content,
-    vertical=True,
-    pills=True,
-    className="bg-light",
-    style=SIDEBAR_STYLE
-)
+def create_sidebar():
+    return html.Div([
+        html.Div([
+            html.Button(
+                html.I(className="fas fa-bars fa-lg"),
+                id="sidebar-toggle",
+                className="btn btn-primary sidebar-toggle"
+            ),
+            html.H3("AuroPulse", className="sidebar-title"),
+        ], className="sidebar-header"),
+        html.Hr(),
+        dbc.Nav(
+            [
+                dbc.NavLink(
+                    [html.Div(page["name"], className="ms-2")],
+                    href=page["path"],
+                    active="exact",
+                )
+                for page in dash.page_registry.values()
+            ],
+            vertical=True,
+            pills=True,
+        ),
+    ],
+    id="sidebar",
+    className="bg-light")
 
 app.layout = html.Div([
     dbc.Container([
         dbc.Row([
             dbc.Col([
-                sidebar
-            ], width=2, className="position-fixed"),  # Fixed position sidebar
+                html.Div(create_sidebar(), id="sidebar-container"),
+            ], width=1, className="p-0 m-0"),
             dbc.Col([
-                html.Div(dash.page_container, style=CONTENT_STYLE)
-            ], width=10, className="offset-2")  # Main content, offset by sidebar width
-        ])
-    ], fluid=True)
-], style={"overflow-x": "hidden"})  # Prevent horizontal scrollbar
+                dash.page_container,
+            ], id="content", width=11, className="p-0 m-0"),
+        ], className="g-0"),
+    ], fluid=True, className="p-0 m-0"),
+    dcc.Store(id="sidebar-state", data="open")
+], className="vh-100")
+
+@callback(
+    Output("sidebar", "className"),
+    Output("sidebar-toggle", "className"),
+    Output("sidebar-container", "className"),
+    Output("content", "className", allow_duplicate=True),
+    Output("sidebar-state", "data"),
+    Input("sidebar-toggle", "n_clicks"),
+    State("sidebar-state", "data"),
+    prevent_initial_call=True
+)
+def toggle_sidebar(n, sidebar_state):
+    if callback_context.triggered_id == "sidebar-toggle":
+        if sidebar_state == "open":
+            return "bg-light sidebar-closed", "btn btn-primary sidebar-toggle-closed", "sidebar-container-closed", "content-expanded", "closed"
+        else:
+            return "bg-light", "btn btn-primary", "", "", "open"
+    
+    # This case should not be reached due to prevent_initial_call=True
+    return dash.no_update
+
+# If you need to update content className based on sidebar state in other parts of your app:
+@callback(
+    Output("content", "className", allow_duplicate=True),
+    Input("sidebar-state", "data"),
+    prevent_initial_call=True
+)
+def update_content_class(sidebar_state):
+    if sidebar_state == "closed":
+        return "content-expanded"
+    return ""
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8050)
