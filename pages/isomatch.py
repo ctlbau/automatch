@@ -42,54 +42,47 @@ iso_layout = dbc.Container([
             dbc.Card([
                 dbc.CardBody([
                     dbc.Row([
-                        dbc.Col(dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, className='form-control mb-2'), width=12, lg=4),
+                        dbc.Col([
+                            dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, className='form-control mb-2'),
+                            create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select a province', multi=False, class_name='mb-2'),
+                            dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False, className='form-control mb-2'),
+                            html.Label([
+                                'Isochrone Limits:',
+                                html.Br(),
+                                html.Span('(in minutes)', style={'fontSize': '0.8em', 'color': '#6c757d'})
+                            ], className='me-2 my-auto'),
+                            dcc.RangeSlider(
+                                id='time-limit-range-slider',
+                                min=5, max=60, step=5, value=[5, 10],
+                                marks={i: f'{i}' for i in range(5, 61, 5)},
+                                className='mb-3'
+                            ),
+                            dbc.Button('Submit', id='submit-val', n_clicks=0, color="primary", className='mb-2'),
+                            create_dropdown('shifts-dropdown', options=fetch_shifts().to_dict('records'), label='name', value='name', placeholder='Select a shift', multi=True, class_name='mb-3'),
+                            create_dropdown('managers-dropdown', options=fetch_managers().to_dict('records'), label='name', value='name', placeholder='Select a manager', multi=True, class_name='mb-3'),
+                            create_dropdown('center-dropdown', options=fetch_centers().to_dict('records'), label='name', value='name', placeholder='Select a center', multi=True, class_name='mb-3'),
+                            create_dropdown('exchange-locations-dropdown', options=fetch_exchange_locations().to_dict('records'), label='name', value='name', placeholder='Select an exchange location', multi=True, class_name='mb-3'),
+                            html.Label('Filter by Match Status:', className='mr-2'),
+                            dcc.RadioItems(
+                                id='is-matched-radio',
+                                options=[
+                                    {'label': 'All', 'value': 'all'},
+                                    {'label': 'True', 'value': 'true'},
+                                    {'label': 'False', 'value': 'false'},
+                                ],
+                                value='all',
+                                inline=True,
+                            ),
+                        ], width=12, lg=4),
+                        dbc.Col(
+                            html.Div(
+                                create_map_container('isomatch-map', initial_view_coords=ATOCHA, tooltip_info=iso_tooltip, map_style=CHOSEN_STYLE), 
+                                style={'height': '600px', 'width': '100%'},
+                                className='mb-3 map-wrapper'
+                            ), 
+                            width=12, lg=8
+                        ),
                     ]),
-                    dbc.Row([
-                        dbc.Col(create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select a province', multi=False, class_name='mb-2'), width=12, lg=4),
-                    ]),
-                    dbc.Row([
-                        dbc.Col(dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False, className='form-control'), width=12, lg=4),
-                    ], className='mb-2'),
-                    dbc.Row([
-                        dbc.Col(html.Label([
-                            'Isochrone Limits:',
-                            html.Br(),
-                            html.Span('(in minutes)', style={'fontSize': '0.8em', 'color': '#6c757d'})
-                        ], className='me-2 my-auto'), width=12, lg=1),
-                        dbc.Col(dcc.RangeSlider(
-                            id='time-limit-range-slider',
-                            min=5, max=60, step=5, value=[5, 10],
-                            marks={i: f'{i}' for i in range(5, 61, 5)},
-                        ), width=12, lg=3),
-                    ], className='g-0 align-items-center mb-3'),
-                    dbc.Row([
-                        dbc.Col(dbc.Button('Submit', id='submit-val', n_clicks=0, color="primary"), width=12, lg=4, className='mb-2'),
-                    ]),
-                    dbc.Row([
-                        dbc.Col(create_dropdown('shifts-dropdown', options=fetch_shifts().to_dict('records'), label='name', value='name', placeholder='Select a shift', multi=True, class_name='mb-3'), width=12, lg=4),
-                    ]),
-                    dbc.Row([
-                        dbc.Col(create_dropdown('managers-dropdown', options=fetch_managers().to_dict('records'), label='name', value='name', placeholder='Select a manager', multi=True, class_name='mb-3'), width=12, lg=4),
-                    ]),
-                    dbc.Row([
-                        dbc.Col(create_dropdown('center-dropdown', options=fetch_centers().to_dict('records'), label='name', value='name', placeholder='Select a center', multi=True, class_name='mb-3'), width=12, lg=4),
-                    ]),
-                    dbc.Row([
-                        dbc.Col(create_dropdown('exchange-locations-dropdown', options=fetch_exchange_locations().to_dict('records'), label='name', value='name', placeholder='Select an exchange location', multi=True, class_name='mb-3'), width=12, lg=4),
-                    ]),
-                    dbc.Row([
-                        dbc.Col(html.Label('Filter by Match Status:', className='mr-2'), width='auto'),
-                        dbc.Col(dcc.RadioItems(
-                            id='is-matched-radio',
-                            options=[
-                                {'label': 'All', 'value': 'all'},
-                                {'label': 'True', 'value': 'true'},
-                                {'label': 'False', 'value': 'false'},
-                            ],
-                            value='all',
-                            inline=True,
-                        ), width='auto'),
-                    ], className='justify-content-start'),
                 ], className='px-2 py-2'),
             ], className='mb-3'),
             
@@ -101,13 +94,6 @@ iso_layout = dbc.Container([
                 is_open=False,
                 className='mb-3',
             ),
-            
-            html.Div(
-                create_map_container('isomatch-map', initial_view_coords=ATOCHA, tooltip_info=iso_tooltip, map_style=CHOSEN_STYLE), 
-                style={'height': '600px', 'width': '100%'},
-                className='mb-3 map-wrapper'
-            ),
-            
             html.Div(id='data-tables-container', children=[]),
         ], width=12, lg=11, xl=11, className='px-3'),
     ], justify='start', className='mx-0'),
