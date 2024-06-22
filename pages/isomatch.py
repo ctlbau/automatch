@@ -57,29 +57,35 @@ iso_layout = dbc.Container([
                                 marks={i: f'{i}' for i in range(5, 61, 5)},
                                 className='mb-3'
                             ),
-                            dbc.Button('Submit', id='submit-val', n_clicks=0, color="primary", className='mb-2'),
                             create_dropdown('shifts-dropdown', options=fetch_shifts().to_dict('records'), label='name', value='name', placeholder='Select a shift', multi=True, class_name='mb-3'),
                             create_dropdown('managers-dropdown', options=fetch_managers().to_dict('records'), label='name', value='name', placeholder='Select a manager', multi=True, class_name='mb-3'),
                             create_dropdown('center-dropdown', options=fetch_centers().to_dict('records'), label='name', value='name', placeholder='Select a center', multi=True, class_name='mb-3'),
                             create_dropdown('exchange-locations-dropdown', options=fetch_exchange_locations().to_dict('records'), label='name', value='name', placeholder='Select an exchange location', multi=True, class_name='mb-3'),
-                            html.Label('Filter by Match Status:', className='mr-2'),
-                            dcc.RadioItems(
-                                id='is-matched-radio',
-                                options=[
-                                    {'label': 'All', 'value': 'all'},
-                                    {'label': 'True', 'value': 'true'},
-                                    {'label': 'False', 'value': 'false'},
-                                ],
-                                value='all',
-                                inline=True,
-                            ),
+                            dbc.Row([
+                                dbc.Col(html.Label('Filter by Match Status:', className='mr-2'), width='auto'),
+                                dbc.Col(dcc.RadioItems(
+                                    id='is-matched-radio',
+                                    options=[
+                                        {'label': 'All', 'value': 'all'},
+                                        {'label': 'True', 'value': 'true'},
+                                        {'label': 'False', 'value': 'false'},
+                                    ],
+                                    value='all',
+                                    inline=True,
+                                ), width='auto'),
+                                dbc.Col(dbc.Button('Submit', id='submit-val', n_clicks=0, color="primary"), width='auto'),
+                            ], className='align-items-center mb-2'),
                         ], width=12, lg=4),
                         dbc.Col(
-                            html.Div(
-                                create_map_container('isomatch-map', initial_view_coords=ATOCHA, tooltip_info=iso_tooltip, map_style=CHOSEN_STYLE), 
-                                style={'height': '600px', 'width': '100%'},
-                                className='mb-3 map-wrapper'
-                            ), 
+                            dbc.Card([
+                                dbc.CardBody(
+                                    html.Div(
+                                        create_map_container('isomatch-map', initial_view_coords=ATOCHA, tooltip_info=iso_tooltip, map_style=CHOSEN_STYLE), 
+                                        style={'height': '500px', 'width': '100%'},
+                                        className='map-wrapper'
+                                    )
+                                )
+                            ], className='mb-3'),
                             width=12, lg=8
                         ),
                     ]),
@@ -97,7 +103,7 @@ iso_layout = dbc.Container([
             html.Div(id='data-tables-container', children=[]),
         ], width=12, lg=11, xl=11, className='px-3'),
     ], justify='start', className='mx-0'),
-], fluid=True, className='mt-3 px-0')
+], fluid=True, className='mt-3 px-1')
 
 stats_layout = dbc.Container([
     dbc.Row([
@@ -107,42 +113,48 @@ stats_layout = dbc.Container([
             create_modal('manager-stats-modal', 'manager-stats-modal-title', 'manager-stats-modal-body', 'manager-stats-modal-footer'),
             
             dbc.Card([
-                dbc.CardBody([
-                    dbc.Row([
-                        dbc.Col(create_dropdown(
-                            id='exchange-locations-dropdown',
-                            options=fetch_exchange_locations().to_dict('records'),
-                            label='name',
-                            value='id',
-                            placeholder='Select an exchange location',
-                            multi=False,
-                            add_all=True,
-                            class_name="mb-3"
-                        ), width=12, md=8, lg=6, xl=4),
-                    ], justify="start"),
-                ], className='px-2 py-2'),
+                dbc.CardBody(
+                    dcc.Loading(
+                        id="loading-peak-container",
+                        type="circle",
+                        children=[
+                            dbc.Row([
+                                dbc.Col(create_dropdown(
+                                    id='exchange-locations-dropdown',
+                                    options=fetch_exchange_locations().to_dict('records'),
+                                    label='name',
+                                    value='id',
+                                    placeholder='Select an exchange location',
+                                    multi=False,
+                                    add_all=True,
+                                    class_name="mb-3"
+                                ), width=12, lg=4),
+                            ], justify="start"),
+                            dbc.Row([
+                                dbc.Col(
+                                    html.Div(id='stats-graph-container', style={'height': '500px', 'width': '100%'}, className='map-wrapper'),
+                                    width=12
+                                ),
+                            ], justify="start"),
+                        ]
+                    )
+                ),
             ], className='mb-3'),
             
-            dcc.Loading(
-                id="loading-peak-container",
-                type="circle",
-                children=[
-                    html.Div(id='stats-grid-container', children=[], className='mb-3'),
-                    dbc.Collapse(
-                        dbc.Row([
-                            dbc.Col([
-                                dbc.Button("Show Errors", id="show-error-modal-btn", color="secondary", className="me-2"),
-                                dbc.Button("Download CSV", id="download-manager-stats-csv-btn", color="primary"),
-                            ], width="auto"),
-                        ], justify="center", className='mt-3'),
-                        id="button-collapse",
-                        is_open=False,
-                    ),
-                ]
+            html.Div(id='stats-grid-container', children=[], className='mb-3'),
+            dbc.Collapse(
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Button("Show Errors", id="show-error-modal-btn", color="secondary", className="me-2"),
+                        dbc.Button("Download CSV", id="download-manager-stats-csv-btn", color="primary"),
+                    ], width="auto"),
+                ], justify="center", className='mt-3'),
+                id="button-collapse",
+                is_open=False,
             ),
         ], width=12, lg=11, xl=11, className='px-3'),
     ], justify='center', className='mx-0'),
-], fluid=True, className='mt-3 px-0')
+], fluid=True, className='mt-3 px-1')
 
 @callback(
     Output("content", "className"),
@@ -174,6 +186,7 @@ def render_content(tab):
         return None
 
 @callback(
+    Output('stats-graph-container', 'children'), 
     Output('stats-grid-container', 'children'), 
     Output('error-data-store', 'data'),
     Output('button-collapse', 'is_open'),
@@ -204,15 +217,16 @@ def update_stats_grid_and_graph(exchange_locations_id, sidebar_state, exchange_l
                 manager_stats = manager_stats.drop(columns=['exchange_location'])
                 grid = create_data_table('manager-stats', manager_stats, f'manager_stats_{today}_at_{exchange_location}.csv', page_size=20, custom_height='800px')
             else:
-                return dash.no_update, dash.no_update, False
+                return dash.no_update, dash.no_update, dash.no_update, False
 
         container_class = 'content-expanded' if sidebar_state == 'closed' else ''
         return [
-            html.Div([fig, grid], className=container_class),
+            fig,
+            grid,
             error_df.to_dict('records') if error_df is not None else None,
             True
         ]
-    return dash.no_update, dash.no_update, False  # Hide the buttons
+    return dash.no_update, dash.no_update, dash.no_update, False  # Hide the buttons
 
 @callback(
     Output('manager-stats-modal', 'is_open'),
@@ -393,7 +407,7 @@ def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_match
             data_tables = []
             num_partitions = len(partitioned_drivers)
             for i, partition in enumerate(partitioned_drivers):
-                partition = partition.drop(columns=['geometry', 'lat', 'lng'])
+                partition = partition.drop(columns=['driver_id', 'matched_driver_id', 'geometry', 'lat', 'lng'])
                 current_date = datetime.now().strftime("%Y-%m-%d")
                 csv_filename = f"drivers_within_{time_limits[0] + i * 5}_min_isochrone_centered_on_{street}_{province}_at_{current_date}.csv"
                 table = create_data_table({'type': 'drivers-table', 'index': i}, partition, csv_filename, page_size=10)
