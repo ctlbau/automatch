@@ -194,9 +194,9 @@ def create_navbar_options(count_or_proportion_id):
         ]
     )
 
-def create_date_range_picker(id, min_date, max_date):
+def create_date_range_picker(id, min_date, max_date, populate_days_from_today=7):
     today = datetime.today().date()
-    seven_days_prior = today - timedelta(days=7)
+    seven_days_prior = today - timedelta(days=populate_days_from_today)
     return html.Nav(
         className="navbar navbar-expand-lg mb-2",
         children=[
@@ -211,7 +211,7 @@ def create_date_range_picker(id, min_date, max_date):
                             min_date_allowed=min_date,
                             max_date_allowed=max_date,
                             display_format='D MMM YYYY',
-                        ), className="col-md-4 offset-md-4 col-12"
+                        ), className="form-control mb-3"
                     )
                 ]
             )
@@ -226,7 +226,7 @@ def create_dropdown(id, options, label='name', value='id', placeholder='Select a
     return dcc.Dropdown(
         id=id,
         options=options,
-        value=[],
+        value=[] if multi else None,
         multi=multi,
         clearable=True,
         placeholder=placeholder,
