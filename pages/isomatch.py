@@ -43,7 +43,7 @@ iso_layout = dbc.Container([
                 dbc.CardBody([
                     dbc.Row([
                         dbc.Col([
-                            dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, className='form-control mb-2'),
+                            dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, className='form-control mb-2', autoFocus=True),
                             create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select a province', multi=False, class_name='mb-2'),
                             dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False, className='form-control mb-2'),
                             html.Label([
@@ -75,7 +75,7 @@ iso_layout = dbc.Container([
                                 ), width='auto'),
                                 dbc.Col(dbc.Button('Submit', id='submit-val', n_clicks=0, color="primary"), width='auto'),
                             ], className='align-items-center mb-2'),
-                        ], width=12, lg=4),
+                        ], width=12, lg=3),
                         dbc.Col(
                             dbc.Card([
                                 dbc.CardBody(
@@ -86,7 +86,7 @@ iso_layout = dbc.Container([
                                     )
                                 )
                             ], className='mb-3'),
-                            width=12, lg=8
+                            width=12, lg=9
                         ),
                     ]),
                 ], className='px-2 py-2'),
@@ -123,7 +123,7 @@ stats_layout = dbc.Container([
                                     id='exchange-locations-dropdown',
                                     options=fetch_exchange_locations().to_dict('records'),
                                     label='name',
-                                    value='id',
+                                    value='name',
                                     placeholder='Select an exchange location',
                                     multi=False,
                                     add_all=True,
@@ -219,7 +219,6 @@ def update_stats_grid_and_graph(exchange_locations_id, sidebar_state, exchange_l
             else:
                 return dash.no_update, dash.no_update, dash.no_update, False
 
-        container_class = 'content-expanded' if sidebar_state == 'closed' else ''
         return [
             fig,
             grid,
@@ -446,3 +445,4 @@ def resize_map(active_tab):
     if active_tab == 'iso-tab':
         return {'width': '100%', 'height': '100%'}
     return {'width': '100%', 'height': '0'}  # Hide map on other tabs
+ 

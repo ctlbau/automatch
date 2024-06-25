@@ -187,7 +187,7 @@ def create_navbar_options(count_or_proportion_id):
                             ],
                             value='count',
                             inline=True
-                        ), className="col-md-4 offset-md-4 col-12"
+                        ), className='align-items-center mb-2'
                     )
                 ]
             )
@@ -198,7 +198,7 @@ def create_date_range_picker(id, min_date, max_date, populate_days_from_today=7)
     today = datetime.today().date()
     seven_days_prior = today - timedelta(days=populate_days_from_today)
     return html.Nav(
-        className="navbar navbar-expand-lg mb-2",
+        className="navbar navbar-expand-lg",
         children=[
             html.Div(
                 className="container-fluid",
@@ -210,7 +210,7 @@ def create_date_range_picker(id, min_date, max_date, populate_days_from_today=7)
                             end_date=today,
                             min_date_allowed=min_date,
                             max_date_allowed=max_date,
-                            display_format='D MMM YYYY',
+                            display_format='D MMM YY',
                         ), className="form-control mb-3"
                     )
                 ]
@@ -230,7 +230,7 @@ def create_dropdown(id, options, label='name', value='id', placeholder='Select a
         multi=multi,
         clearable=True,
         placeholder=placeholder,
-        className=f'dash-dropdown {class_name}'
+        className=f'dash-dropdown {class_name} form-control mb-3'
     )
 
 
@@ -311,7 +311,9 @@ def create_line_graph(data, values_type):
     fig.update_layout(height=400, xaxis_tickangle=-45, yaxis=dict(type='log'))
     fig.update_xaxes(tickformat="%Y-%m-%d")
     fig.update_xaxes(rangeslider_visible=True)
-    return dcc.Graph(figure=fig)
+    fig = dcc.Graph(figure=fig)
+    fig.responsive = True
+    return fig
 
 
 
@@ -325,7 +327,12 @@ def plot_distance_histogram(df):
     num_bins = 50
     bins = np.linspace(min_distance, max_distance, num_bins + 1)
 
-    hist_data = df.groupby(pd.cut(df['distance'], bins=bins)).agg(
+    # hist_data = df.groupby(pd.cut(df['distance'], bins=bins)).agg(
+    #     count=('distance', 'count'),
+    #     drivers=('driver', lambda x: ', '.join(map(str, x)))
+    # ).reset_index()
+
+    hist_data = df.groupby(pd.cut(df['distance'], bins=bins), observed=True).agg(
         count=('distance', 'count'),
         drivers=('driver', lambda x: ', '.join(map(str, x)))
     ).reset_index()

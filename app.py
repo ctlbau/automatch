@@ -67,7 +67,7 @@ app.layout = html.Div([
             ], width=1, className="p-0 m-0"),
             dbc.Col([
                 dash.page_container,
-            ], id="content", width=11, className="p-0 m-0"),
+            ], id="content", width=12, className="p-0 m-0"),
         ], className="g-0"),
     ], fluid=True, className="p-0 m-0"),
     dcc.Store(id="sidebar-state", data="open")
@@ -88,21 +88,9 @@ def toggle_sidebar(n, sidebar_state):
         if sidebar_state == "open":
             return "bg-light sidebar-closed", "btn btn-primary sidebar-toggle-closed", "sidebar-container-closed", "content-expanded", "closed"
         else:
-            return "bg-light", "btn btn-primary", "", "", "open"
-    
-    # This case should not be reached due to prevent_initial_call=True
+            return "bg-light", "btn btn-primary sidebar-toggle", "", "", "open"
     return dash.no_update
 
-# If you need to update content className based on sidebar state in other parts of your app:
-@callback(
-    Output("content", "className", allow_duplicate=True),
-    Input("sidebar-state", "data"),
-    prevent_initial_call=True
-)
-def update_content_class(sidebar_state):
-    if sidebar_state == "closed":
-        return "content-expanded"
-    return ""
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8050)

@@ -18,68 +18,83 @@ AURO = (-3.587811320499316, 40.39171586339568)
 
 dash.register_page(__name__, path='/fleet')
 
-layout = html.Div([
-    dcc.Tabs(id="tabs", value='manager-tab', children=[
-        dcc.Tab(label='Manager View', value='manager-tab'),
-        dcc.Tab(label='Vehicle view', value='vehicle-tab'),
-    ], className="col-md-3 offset-md-1 col-12"),
-    html.Div(id='tabs-content'),
-    dcc.Store(id='plate-map-store'),
-])
+layout = dbc.Container([
+    dbc.Row([
+        dbc.Col([
+            dbc.Tabs(
+                id="fleet-tabs",
+                active_tab="vehicle-tab",
+                children=[
+                    dbc.Tab(label="Manager View", tab_id="manager-tab"),
+                    dbc.Tab(label="Vehicle View", tab_id="vehicle-tab"),
+                ],
+                className="mb-3 sidebar-adjacent-tabs"
+            ),
+            html.Div(id='fleet-tabs-content')
+        ], className="p-0")
+    ], className="g-0")
+], fluid=True, className="p-0")
 
 @callback(
-    Output('plate-map-store', 'data'),
-    Input('tabs', 'value')
+    Output('fleet-tabs-content', 'children'),
+    Input('fleet-tabs', 'active_tab')
 )
-def update_plate_map_store(tab):
-    if tab == 'vehicle-tab':
-        plate_map = lic_plate2sher_id_map()
-        if plate_map:
-            return plate_map
-    return dash.no_update
-
-@callback(
-    Output('tabs-content', 'children'),
-    Input('tabs', 'value')
-)
-def render_ui(tab):
+def render_fleet_ui(active_tab):
     min_date, max_date = fetch_date_range()
-    if tab == 'manager-tab':
-        center_options = fetch_centers().to_dict('records')
-        status_options = fetch_statuses().to_dict('records')
-        manager_options = fetch_managers().to_dict('records')
-        company_options = fetch_companies_ids().to_dict('records')
-        return [
-            create_dropdown('manager-dropdown', options=manager_options, label='name', value='name', placeholder='Select manager', multi=False, add_all=True),
-            create_dropdown('company-dropdown', options=company_options, label='company', value='ids', placeholder='Select company', multi=True, add_all=False),
-            create_dropdown('center-dropdown', options=center_options, label='name', value='id', placeholder='Select center', multi=True, add_all=False),
-            create_dropdown('status-dropdown', options=status_options, label='status', value='status', placeholder='Select status', multi=True, add_all=False),
-            create_date_range_picker('date-picker-range', min_date, max_date),
-            create_navbar_options('count-proportion-radio'),
-            html.Div(id='manager-view-graph-and-table-container', className="col-md-9 offset-md-2 col-12"),
-            create_modal('details-modal-all', 'details-modal-title-all', 'modal-content-all', 'modal-footer-all'),
-            create_modal('details-modal-part', 'details-modal-title-part', 'modal-content-part', 'modal-footer-part'),
-        ]
-    elif tab == 'vehicle-tab':
-        plates_options = fetch_plates().to_dict('records')
-        return [
-            dbc.Container([
-                dbc.Row([
-                    dbc.Col([
-                        create_dropdown('plate-dropdown', options=plates_options, label='plate', value='plate', placeholder='Select plate', multi=False, add_all=False),
+    if active_tab == 'manager-tab':
+        return create_manager_layout(min_date, max_date)
+    elif active_tab == 'vehicle-tab':
+        return create_vehicle_layout(min_date, max_date)
+
+
+
+def create_manager_layout(min_date, max_date):
+    center_options = fetch_centers().to_dict('records')
+    status_options = fetch_statuses().to_dict('records')
+    manager_options = fetch_managers().to_dict('records')
+    company_options = fetch_companies_ids().to_dict('records')
+    
+    return dbc.Container([
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        create_dropdown('manager-dropdown', options=manager_options, label='name', value='name', placeholder='Select manager', multi=False, add_all=True),
+                        create_dropdown('company-dropdown', options=company_options, label='company', value='ids', placeholder='Select company', multi=True, add_all=False),
+                        create_dropdown('center-dropdown', options=center_options, label='name', value='id', placeholder='Select center', multi=True, add_all=False),
+                        create_dropdown('status-dropdown', options=status_options, label='status', value='status', placeholder='Select status', multi=True, add_all=False),
                         create_date_range_picker('date-picker-range', min_date, max_date),
-                        html.Div(id='alert-placeholder-vehicle'),
-                        html.Div(id='vehicle-view-graph-container'),
-                        html.Div(create_map_container('last-location-map', initial_view_coords=AURO, tooltip_info={}, map_style=CHOSEN_STYLE), style={'width': '80%', 'position': 'relative', 'marginTop': '10px', 'marginLeft': 'auto', 'marginRight': 'auto'}),
-                    ], width={'size': 10, 'offset': 2, 'align': 'center'}),
-                ])
-            ], fluid=True)
-        ]
+                        create_navbar_options('count-proportion-radio'),
+                    ])
+                ], className="mb-3"),
+            ], width=3),
+            dbc.Col([
+                dbc.Spinner(
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.Div(id='manager-view-graph-container')
+                        ])
+                    ], className="mb-3", id='manager-view-graph-card', style={'display': 'none'})
+                ),
+            ], width=9)
+        ]),
+        dbc.Row([
+            dbc.Col([
+                html.Div(id='manager-view-table-container'),
+                html.Div(id='manager-view-button-container', className="text-right mt-2")
+            ], width=12)
+        ], className="mt-3"),
+        create_modal('details-modal-all', 'details-modal-title-all', 'modal-content-all', 'modal-footer-all'),
+        create_modal('details-modal-part', 'details-modal-title-part', 'modal-content-part', 'modal-footer-part'),
+    ], fluid=True)
 
 @callback(
-    Output('manager-view-graph-and-table-container', 'children'),
+    [Output('manager-view-graph-container', 'children'),
+     Output('manager-view-table-container', 'children'),
+     Output('manager-view-button-container', 'children'),
+     Output('manager-view-graph-card', 'style')],
     [
-        Input('tabs', 'value'),
+        Input('fleet-tabs', 'active_tab'),
         Input('date-picker-range', 'start_date'),
         Input('date-picker-range', 'end_date'),
         Input('company-dropdown', 'value'),
@@ -90,12 +105,12 @@ def render_ui(tab):
     ],
     State('status-dropdown', 'options')
 )
-def update_managerview_table_and_graph(tab, start_date, end_date, company_ids, selected_centers, selected_manager, selected_statuses, count_proportion_radio, status_options):
+def update_managerview_components(tab, start_date, end_date, company_ids, selected_centers, selected_manager, selected_statuses, count_proportion_radio, status_options):
     if tab != 'manager-tab':
-        return dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, {'display': 'none'}
     if company_ids == [] or company_ids is None:
-        return dash.no_update
-    print('company_ids:', company_ids)
+        return dash.no_update, dash.no_update, dash.no_update, {'display': 'none'}
+
     base_df = fetch_vehicles(selected_centers, company_ids=company_ids, from_date=start_date, to_date=end_date)
     agg_df = calculate_aggregations(base_df, ['date', 'status'])
     table_page_size = len(selected_statuses) + 1 if selected_statuses else len(status_options) + 1
@@ -122,14 +137,11 @@ def update_managerview_table_and_graph(tab, start_date, end_date, company_ids, s
         download_button = html.Button('Download CSV', id='download-main-table-all-csv', n_clicks=0)
         fig = create_line_graph(agg_df, count_proportion_radio)
 
-        return [fig, table, download_button]
-
     else:
-
         if selected_manager:
             base_df = base_df[base_df['manager'] == selected_manager]
         else:
-            return dash.no_update
+            return dash.no_update, dash.no_update, dash.no_update, {'display': 'none'}
 
         if selected_statuses:
             base_df = base_df[base_df['status'].isin(selected_statuses)]
@@ -143,8 +155,148 @@ def update_managerview_table_and_graph(tab, start_date, end_date, company_ids, s
         table = create_data_table('main-table-part', manager_pivot_df, csv_filename, table_page_size)
         download_button = html.Button('Download CSV', id='download-main-table-part-csv', n_clicks=0)
         fig = create_line_graph(manager_agg_df, count_proportion_radio)
+    
+    return fig, table, download_button, {'display': 'block'}
 
-        return [fig, table, download_button]
+def create_vehicle_layout(min_date, max_date):
+    plates_options = fetch_plates().to_dict('records')
+    
+    return dbc.Container([
+        dcc.Store(id='plate-map-store'),
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        create_dropdown('plate-dropdown', options=plates_options, label='plate', value='plate', placeholder='Select plate', multi=False, add_all=False),
+                        create_date_range_picker('date-picker-range', min_date, max_date, populate_days_from_today=14),
+                    ])
+                ], className="mb-3"),
+                html.Div(id='alert-placeholder-vehicle'),
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.Div(id='vehicle-view-graph-container')
+                    ])
+                ], className="mb-3", id='vehicle-view-graph-card', style={'display': 'none'}),
+            ], width=9),
+        ]),
+        dbc.Row([
+            dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.Div(
+                                create_map_container('last-location-map', initial_view_coords=AURO, tooltip_info={}, map_style=CHOSEN_STYLE),
+                                style={'width': '100%', 'height': '400px', 'position': 'relative'}
+                            )
+                        ])
+                    ], className="mb-3", id='last-location-card', style={'display': 'none'}),
+            ], width=12)
+        ])
+    ], fluid=True)
+
+@callback(
+    Output('plate-map-store', 'data'),
+    Input('tabs', 'active_tab'),
+    Input('url', 'pathname')
+)
+def update_plate_map_store(tab, pathname):
+    if tab == 'vehicle-tab' or pathname == '/fleet':
+        plate_map = lic_plate2sher_id_map()
+        if plate_map:
+            return plate_map
+    return dash.no_update
+
+@callback(
+    Output('vehicle-view-graph-container', 'children'),
+    Output('vehicle-view-graph-card', 'style'),
+    Output('last-location-card', 'style'),
+    [
+        Input('plate-dropdown', 'value'),
+        Input('date-picker-range', 'start_date'),
+        Input('date-picker-range', 'end_date')
+    ]
+)
+def update_vehicle_view(selected_plate, start_date, end_date):
+    if not selected_plate:
+        return None, {'display': 'none'}, {'display': 'none'}
+
+    df = select_plate(plate=selected_plate, from_date=start_date, to_date=end_date)
+    if df.empty:
+        return None, {'display': 'none'}, {'display': 'none'}
+
+    fig = px.line(df, x='date', y='status', title=f'Vehicle Status Over Time for vehicle {selected_plate}', markers=True)
+    fig.update_layout(height=400, xaxis_tickangle=-45)
+    fig.update_xaxes(tickformat="%Y-%m-%d")
+    
+    return dcc.Graph(figure=fig), {'display': 'block'}, {'display': 'block'}
+
+
+@callback(
+    Output('last-location-map', 'data'),
+    Output('alert-placeholder-vehicle', 'children'),
+    Input('plate-dropdown', 'value'),
+    State('plate-map-store', 'data')
+)
+def update_map(selected_plate, plate_map):
+    if not selected_plate:
+        return dash.no_update, None
+
+    if plate_map is None:
+        plate_map = lic_plate2sher_id_map()
+        if not plate_map:
+            return dash.no_update, dbc.Alert("Failed to fetch plate map data. Please try refreshing the page.", color="danger", className="col-md-4 offset-md-4 col-12")
+
+    if selected_plate not in plate_map:
+        return dash.no_update, dbc.Alert(f"License plate '{selected_plate}' not found in Sherlog's database.", color="warning", className="col-md-4 offset-md-4 col-12")
+
+    coords = get_last_coordinates_by_plate(selected_plate, plate_map)
+    if not coords:
+        return dash.no_update, dbc.Alert(f"Valid coordinates for vehicle {selected_plate} not found.", color="danger", className="col-md-4 offset-md-4 col-12")
+    
+    lat, lon = float(coords['lat']), float(coords['lng'])
+    address = geodecode_coordinates(lat, lon)
+    
+    data = pd.DataFrame({
+        "lat": [lat],
+        "lon": [lon],
+        "plate": [selected_plate],
+        "address": [address] if address else ["Unknown"]
+    })
+    icon_data = {
+        "url": "https://img.icons8.com/ios-filled/50/000000/car--v1.png",
+        "width": 250,
+        "height": 250,
+    }
+
+    data.loc[:, "icon_data"] = None
+    for i in data.index:
+        data['icon_data'] = data.apply(lambda x: icon_data, axis=1)
+
+    icon_layer = pdk.Layer(
+        type="IconLayer",
+        data=data,
+        get_icon="icon_data",
+        get_size=8,
+        size_scale=5,
+        get_position=["lon", "lat"],
+        pickable=True,
+    )
+
+    view_state = pdk.ViewState(
+        longitude=lon,
+        latitude=lat,
+        zoom=16,
+        pitch=0,
+        bearing=0,
+    )
+
+    deck_data = pdk.Deck(
+        layers=[icon_layer],
+        initial_view_state=view_state,
+        map_style=CHOSEN_STYLE
+    ).to_json()
+    return deck_data, None
 
 
 @callback(
@@ -294,92 +446,6 @@ def download_csv(n_clicks):
         return True
     return dash.no_update
 
-@callback(
-    Output('vehicle-view-graph-container', 'children'),
-    [
-        Input('tabs', 'value'),
-        Input('plate-dropdown', 'value'),
-        Input('date-picker-range', 'start_date'),
-        Input('date-picker-range', 'end_date')
-    ]
-)
-def update_vehicle_view(tab, selected_plate, start_date, end_date):
-    if tab != 'vehicle-tab':
-        return dash.no_update
-
-    if selected_plate:
-        df = select_plate(plate=selected_plate, from_date=start_date, to_date=end_date)
-        fig = px.line(df, x='date', y='status', title='Vehicle Status Over Time', markers=True)
-        fig.update_layout(height=400, xaxis_tickangle=-45)
-        fig.update_xaxes(tickformat="%Y-%m-%d")
-    else:
-        return dash.no_update
-    
-    return dbc.Row([dbc.Col(dcc.Graph(figure=fig), width=12)])
-
-
-
-
-@callback(
-        Output('last-location-map', 'data'),
-        Output('alert-placeholder-vehicle', 'children'),
-        Input('plate-dropdown', 'value'),
-        State('plate-map-store', 'data')
-        )
-def update_map(selected_plate, plate_map):
-    if not selected_plate:
-        return dash.no_update
-    if selected_plate not in plate_map:
-        return dash.no_update, dbc.Alert(f"License plate '{selected_plate}' not found in Sherlog's database.", color="warning", className="col-md-4 offset-md-4 col-12")
-
-    coords = get_last_coordinates_by_plate(selected_plate, plate_map)
-    if not coords:
-        return dash.no_update, dbc.Alert(f"Valid coordinates for vehicle {selected_plate} not found.", color="danger", className="col-md-4 offset-md-4 col-12")
-    
-    lat, lon = float(coords['lat']), float(coords['lng'])
-    address = geodecode_coordinates(lat, lon)
-    
-    data = pd.DataFrame({
-        "lat": [lat],
-        "lon": [lon],
-        "plate": [selected_plate],
-        "address": [address] if address else ["Unknown"]
-    })
-    icon_data = {
-        "url": "https://img.icons8.com/ios-filled/50/000000/car--v1.png",
-        "width": 250,
-        "height": 250,
-    }
-
-    data.loc[:, "icon_data"] = None
-    for i in data.index:
-        data['icon_data'] = data.apply(lambda x: icon_data, axis=1)
-
-    icon_layer = pdk.Layer(
-        type="IconLayer",
-        data=data,
-        get_icon="icon_data",
-        get_size=8,
-        size_scale=5,
-        get_position=["lon", "lat"],
-        pickable=True,
-    )
-
-    view_state = pdk.ViewState(
-        longitude=lon,
-        latitude=lat,
-        zoom=16,
-        pitch=0,
-        bearing=0,
-    )
-
-    deck_data = pdk.Deck(
-        layers=[icon_layer],
-        initial_view_state=view_state,
-        map_style=CHOSEN_STYLE
-    ).to_json()
-    return deck_data, None
-
     
 @callback(
         Output('main-table-all', 'exportDataAsCsv'),
@@ -419,3 +485,12 @@ def download_csv(n_clicks):
         return True
     return dash.no_update
 
+@callback(
+    Output("content", "className", allow_duplicate=True),
+    Input("sidebar-state", "data"),
+    prevent_initial_call=True
+)
+def adjust_content(sidebar_state):
+    if sidebar_state == "closed":
+        return "mt-3 px-3 content-expanded"
+    return "mt-3 px-3"
