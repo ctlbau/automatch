@@ -1,0 +1,271 @@
+/* General styles */
+body {
+    font-family: Arial, sans-serif;
+    overflow-x: hidden;
+}
+
+/* Map styles */
+.map-wrapper {
+    position: relative;
+    overflow: hidden;
+}
+
+.map-wrapper > div {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.Select-control, .Select-menu-outer {
+    width: 100% !important;
+}
+
+/* Sidebar styles */
+#sidebar-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 250px;
+    z-index: 1000;
+    transition: all 0.3s;
+}
+
+#sidebar {
+    height: 100%;
+    width: 100%;
+    transition: all 0.3s;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    padding-bottom: 1rem;
+}
+
+.sidebar-toggle {
+    margin-right: 1rem;
+}
+
+.sidebar-title {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.sidebar-closed {
+    width: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.sidebar-container-closed {
+    width: 0 !important;
+    padding: 0;
+    overflow: hidden;
+}
+
+#sidebar-toggle {
+    z-index: 1001;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    transition: all 0.3s;
+}
+
+.sidebar-toggle-closed {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+}
+
+/* Adjust the content area */
+#content {
+    transition: margin-left 0.3s ease-in-out, width 0.3s ease-in-out, padding-top 0.3s ease-in-out;
+    width: calc(100% - 250px);
+    margin-left: 250px;
+    padding-top: 0; /* No padding when sidebar is open */
+}
+
+.content-expanded {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding-top: 60px !important; /* Add padding when sidebar is closed */
+}
+
+/* Adjust the toggle button */
+#sidebar-toggle {
+    z-index: 1001;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    transition: all 0.3s;
+    position: fixed;
+    top: 10px;
+    left: 260px; /* Position it just outside the sidebar */
+}
+
+.sidebar-toggle-closed {
+    left: 10px !important;
+}
+
+/* Adjust the tabs */
+.sidebar-adjacent-tabs {
+    margin-left: 15px;
+    padding-left: 40px; /* Make room for the toggle button */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #content {
+        padding-top: 60px !important; /* Always have padding on mobile */
+    }
+
+    .sidebar-adjacent-tabs {
+        padding-left: 50px; /* Increase padding on mobile */
+    }
+}
+
+/* Content styles */
+/* #content {
+    transition: margin-left 0.3s ease-in-out, width 0.3s ease-in-out;
+    width: calc(100% - 250px);
+    margin-left: 250px;
+}
+
+.content-expanded {
+    width: 100% !important;
+    margin-left: 0 !important;
+} */
+
+/* Layout adjustments */
+.container-fluid {
+    width: 100%;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+/* .container-fluid {
+    
+    padding-right: 15px;
+    padding-left: 15px;
+    margin-right: auto;
+    margin-left: auto;
+} */
+
+.row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+.col {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.sidebar-adjacent-tabs {
+    margin-left: 15px;
+}
+
+
+/* Card styles */
+.card {
+    border-radius: 0;
+    margin-bottom: 1rem;
+}
+
+.card-body {
+    padding: 1rem;
+}
+
+/* Responsive styles */
+@media (max-width: 991.98px) {
+    body {
+        padding-top: 60px;
+    }
+    
+    .position-fixed {
+        position: static !important;
+    }
+    
+    .offset-2 {
+        margin-left: 0 !important;
+    }
+}
+
+@media (max-width: 768px) {
+    #sidebar-container {
+        margin-left: -250px;
+    }
+
+    #sidebar-container.active {
+        margin-left: 0;
+    }
+
+    #content {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .sidebar-toggle-closed {
+        left: 10px !important;
+    }
+    
+    .label-with-break {
+        line-height: 1.2;
+        margin-top: -5px;
+    }
+    
+    .btn-primary.d-lg-none {
+        display: block;
+        margin: 10px;
+    }
+}
+
+@media (min-width: 992px) {
+    .btn-primary.d-lg-none {
+        display: none;
+    }
+}
+
+/* Font Awesome */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css');
+
+/* Custom styles for tighter layout */
+.px-2 {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+}
+
+.mb-2 {
+    margin-bottom: 0.5rem !important;
+}
+
+.g-2 {
+    --bs-gutter-x: 0.5rem;
+    --bs-gutter-y: 0.5rem;
+}
+
+.h-100 {
+    height: 100% !important;
+}
+
+.w-100 {
+    width: 100% !important;
+}
+
+.p-0 {
+    padding: 0 !important;
+}
+
+.m-0 {
+    margin: 0 !important;
+}
+
+/* Ensure smooth transitions */
+#sidebar, #content, #sidebar-container {
+    transition: all 0.3s ease-in-out;
+}
