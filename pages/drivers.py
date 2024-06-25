@@ -10,45 +10,54 @@ import plotly.express as px
 
 dash.register_page(__name__, path='/drivers')
 
-layout = html.Div([
-    dcc.Tabs(id='driver-tabs', value='availability', children=[
-        dcc.Tab(label='Vacations', value='availability'),
-        dcc.Tab(label='Exchange Locations', value='exchange-locations')
-    ], className="col-md-3 offset-md-1 col-12"),
-    html.Div(id='driver-tabs-content')
-])
+
+layout = dbc.Container([
+    dbc.Row([
+        dbc.Col([
+            dbc.Tabs(id='driver-tabs', active_tab='availability', children=[
+                dbc.Tab(label='Vacations', tab_id='availability'),
+                dbc.Tab(label='Exchange Locations', tab_id='exchange-locations')
+            ], className="mb-3 sidebar-adjacent-tabs"),
+            html.Div(id='driver-tabs-content')
+        ], className="p-0")  # Remove padding from the column
+    ], className="g-0")  # Remove gutters from the row
+], fluid=True, className="p-0")  # Make the container fluid and remove its padding
+
+min_date, max_date = get_min_max_dates_from_schedule_events()
+manager_options = fetch_managers().to_dict('records')
+plates_options = fetch_plates().to_dict('records')
+vacations_layout = dbc.Container([
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.CardBody([
+                    create_date_range_picker('availability-date-range-picker', min_date, max_date),
+                    create_dropdown('manager-dropdown', options=manager_options, label='name', value='name', placeholder='Select Manager', multi=False, add_all=True),
+                    create_dropdown('plate-dropdown', options=plates_options, label='plate', value='plate', placeholder='Select Plate'),
+                ])
+            ], className="mb-3"),
+        ], width=4, className="sidebar-adjacent"),
+    ], className="g-0"),
+    dbc.Row([
+        dbc.Col([
+            dcc.Loading(
+                id="loading-driver-availability",
+                type="circle",
+                children=[html.Div(id='driver-availability-container', style={'minHeight': '500px'})]
+            ),
+        ], width=12),
+    ], className="g-0 mt-3"),
+], fluid=True, className="p-0")  # Make the container fluid and remove its padding
+
 
 @callback(
     Output('driver-tabs-content', 'children'),
-    Input('driver-tabs', 'value')
+    Input('driver-tabs', 'active_tab')
 )
 def render_content(tab):
     if tab == 'availability':
-        min_date, max_date = get_min_max_dates_from_schedule_events()
-        manager_options = fetch_managers().to_dict('records')
-        plates_options = fetch_plates().to_dict('records')
-        vacations_layout = dbc.Container([
-            dbc.Row([
-                dbc.Col([
-                    create_date_range_picker('availability-date-range-picker', min_date, max_date),
-                    create_dropdown('manager-dropdown', options=manager_options, label='name', value='name', placeholder='Select manager', multi=False, add_all=True),
-                    create_dropdown('plate-dropdown', options=plates_options, label='plate', value='plate', placeholder='Select plate', multi=False, add_all=False),
-                    dcc.Loading(html.Div(id='driver-availability-container', children=[], style={'width': '100%'}), type='circle'),
-                ])
-            ])
-        ])
         return vacations_layout
     elif tab == 'exchange-locations':
-        exchange_layout = dbc.Container([
-            dbc.Row([
-                dbc.Col([
-                    create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select Province', multi=True, add_all=True),
-                    html.Div(id='driver-count-per-exchange-location-and-shift-container', children=[]),
-                    html.Button('Download CSV', id='download-driver-count-per-exchange-location-and-shift-csv', n_clicks=0),
-                    create_modal('driver-count-disaggregation-modal', 'driver-count-disaggregation-title', 'driver-count-disaggregation-content', 'driver-count-disaggregation-footer')
-                ])
-            ])
-        ])
         return exchange_layout
 
 @callback(
@@ -71,50 +80,84 @@ def create_vacations_grid(start_date, end_date, manager, plate):
         if plate:
             availability = availability[availability['plate'] == plate]
         page_size = len(availability)
-        custom_height = '700px' if page_size > 10 else None
-        grid = create_data_table("driver-availability-grid", availability, f"driver-availability-for-{start_date}-{end_date}.csv", page_size=page_size, custom_height=custom_height)
+        grid = create_data_table("driver-availability-grid", availability, f"driver-availability-for-{start_date}-{end_date}.csv", page_size=page_size)
         return grid
     else:
         return None
 
+exchange_layout = dbc.Container([
+    dbc.Row([
+        dbc.Col([
+            create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select Province', multi=True, add_all=True),
+        ], width=4, className="sidebar-adjacent"),
+    ], className="g-0 mb-3"),  # Added margin-bottom for spacing
+    dbc.Row([
+        dbc.Col([
+            dcc.Loading(
+                id="loading-driver-count-graph",
+                type="circle",
+                children=[
+                    html.Div(id='driver-count-per-exchange-location-and-shift-container', style={'display': 'none'}),
+                ]
+            ),
+        ], width=12),  # Now spans full width
+    ], className="g-0"),
+    dbc.Row([
+        dbc.Col([
+            dcc.Loading(
+                id="loading-driver-count-grid",
+                type="circle",
+                children=[
+                    html.Div(id='driver-count-grid-container', children=[]),
+                ]
+            ),
+            html.Button('Download CSV', id='download-driver-count-per-exchange-location-and-shift-csv', n_clicks=0, className="mt-3", style={'display': 'none'}),
+        ], width=12),
+    ], className="g-0"),
+    create_modal('driver-count-disaggregation-modal', 'driver-count-disaggregation-title', 'driver-count-disaggregation-content', 'driver-count-disaggregation-footer')
+], fluid=True, className="p-0")
+
 @callback(
     Output('driver-count-per-exchange-location-and-shift-container', 'children'),
+    Output('driver-count-per-exchange-location-and-shift-container', 'style'),
+    Output('driver-count-grid-container', 'children'),
+    Output('download-driver-count-per-exchange-location-and-shift-csv', 'style'),
     Input('province-dropdown', 'value')
 )
 def create_data_table_on_page_load(province_ids):
-    if province_ids:
-        if 'all' in province_ids:
-            province_ids = fetch_provinces()['id'].tolist()
-        drivers_exchange_location_and_shift = fetch_drivers_exchange_location_and_shift(province_ids)
-        drivers_exchange_location_and_shift['exchange_location'] = drivers_exchange_location_and_shift['exchange_location'].fillna('Unknown')
-        driver_count_data = drivers_exchange_location_and_shift.groupby(['exchange_location', 'shift']).size().reset_index(name='count')
-        driver_count_data_pivot = driver_count_data.pivot(
-            index='exchange_location',
-            columns='shift',
-            values='count'
-            )
-        driver_count_data_pivot.fillna(0, inplace=True)
-        driver_count_data_melted = driver_count_data_pivot.reset_index().melt(id_vars='exchange_location', var_name='shift', value_name='count')
-        
-        fig = px.bar(driver_count_data_melted, x='exchange_location', y='count', color='shift', barmode='group',
-                 title='Driver Count per Exchange Location and Shift')
-        fig.update_layout(
-            xaxis_title='Exchange Location',
-            yaxis_title='Count',
-            legend_title='Shift'
-            )
-        
-        driver_count_data_pivot.loc[:, 'Total'] = driver_count_data_pivot.sum(axis=1)
-        driver_count_data_pivot.loc['Total', :] = driver_count_data_pivot.sum(axis=0)
-        driver_count_data_pivot.reset_index(inplace=True)
-        today = datetime.today().strftime('%Y-%m-%d')
-        grid =  create_data_table("driver-count-per-exchange-location-and-shift-grid", 
-                                 driver_count_data_pivot, 
-                                 f"driver-count-per-exchange-location-and-shift-on-{today}.csv",
-                                 page_size=10)
-        return [dcc.Graph(figure=fig), grid]
-    else:
-        return None
+    if not province_ids:
+        return None, {'display': 'none'}, None, {'display': 'none'}
+
+    if 'all' in province_ids:
+        province_ids = fetch_provinces()['id'].tolist()
+    drivers_exchange_location_and_shift = fetch_drivers_exchange_location_and_shift(province_ids)
+    drivers_exchange_location_and_shift['exchange_location'] = drivers_exchange_location_and_shift['exchange_location'].fillna('Unknown')
+    driver_count_data = drivers_exchange_location_and_shift.groupby(['exchange_location', 'shift']).size().reset_index(name='count')
+    driver_count_data_pivot = driver_count_data.pivot(
+        index='exchange_location',
+        columns='shift',
+        values='count'
+        )
+    driver_count_data_pivot.fillna(0, inplace=True)
+    driver_count_data_melted = driver_count_data_pivot.reset_index().melt(id_vars='exchange_location', var_name='shift', value_name='count')
+    
+    fig = px.bar(driver_count_data_melted, x='exchange_location', y='count', color='shift', barmode='group',
+             title='Driver Count per Exchange Location and Shift')
+    fig.update_layout(
+        xaxis_title='Exchange Location',
+        yaxis_title='Count',
+        legend_title='Shift'
+        )
+    
+    driver_count_data_pivot.loc[:, 'Total'] = driver_count_data_pivot.sum(axis=1)
+    driver_count_data_pivot.loc['Total', :] = driver_count_data_pivot.sum(axis=0)
+    driver_count_data_pivot.reset_index(inplace=True)
+    today = datetime.today().strftime('%Y-%m-%d')
+    grid = create_data_table("driver-count-per-exchange-location-and-shift-grid", 
+                             driver_count_data_pivot, 
+                             f"driver-count-per-exchange-location-and-shift-on-{today}.csv",
+                             page_size=10)
+    return dbc.Card([dbc.CardBody([dcc.Graph(figure=fig)])], className="mb-3"), {'display': 'block'}, grid, {'display': 'block'}
 
 @callback(
     Output('driver-count-disaggregation-modal', 'is_open'),

@@ -21,6 +21,30 @@ ATOCHA = (-3.690633, 40.406785)
 MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
 CHOSEN_STYLE = MAP_STYLES[0]
 
+
+layout = dbc.Container([
+    dbc.Row([
+        dbc.Col([
+            dbc.Tabs(id='isomatch-tabs', active_tab='iso-tab', children=[
+                dbc.Tab(label='Isomatch', tab_id='iso-tab'),
+                dbc.Tab(label='Matchstats', tab_id='stats-tab'),
+            ], className="mb-3 sidebar-adjacent-tabs"),
+            html.Div(id='isomatch-tabs-content')
+        ], className="p-0")  
+    ], className="g-0")  
+], fluid=True, className="p-0")
+
+@callback(
+    Output('isomatch-tabs-content', 'children'),
+    Input('isomatch-tabs', 'active_tab')
+)
+def render_content(tab):
+    if tab == 'iso-tab':
+        return iso_layout
+    elif tab == 'stats-tab':
+        return stats_layout
+
+
 iso_tooltip={
     "html": """<b>Name:</b> {name}<br>
                <b>Street:</b> {street}<br>
@@ -156,34 +180,6 @@ stats_layout = dbc.Container([
     ], justify='center', className='mx-0'),
 ], fluid=True, className='mt-3 px-1')
 
-@callback(
-    Output("content", "className"),
-    Input("sidebar-state", "data")
-)
-def adjust_content(sidebar_state):
-    if sidebar_state == "closed":
-        return "mt-3 px-3 content-expanded"
-    return "mt-3 px-3"
-
-layout = dbc.Container([
-    dbc.Tabs(id="tabs", active_tab='iso-tab', children=[
-        dbc.Tab(label='Isomatch', tab_id='iso-tab'),
-        dbc.Tab(label='Matchstats', tab_id='stats-tab'),
-    ], className="nav-fill w-100 mb-3"),
-    html.Div(id='isomatch-tabs-content', style={'height': 'calc(100vh - 100px)'})
-], fluid=True, className='mt-3 px-3', id='content')
-
-@callback(
-    Output('isomatch-tabs-content', 'children'),
-    Input('tabs', 'active_tab')
-)
-def render_content(tab):
-    if tab == 'iso-tab':
-        return iso_layout
-    elif tab == 'stats-tab':
-        return stats_layout
-    else:
-        return None
 
 @callback(
     Output('stats-graph-container', 'children'), 
@@ -445,4 +441,3 @@ def resize_map(active_tab):
     if active_tab == 'iso-tab':
         return {'width': '100%', 'height': '100%'}
     return {'width': '100%', 'height': '0'}  # Hide map on other tabs
- 

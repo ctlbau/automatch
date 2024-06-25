@@ -60,6 +60,7 @@ def create_sidebar():
     className="bg-light")
 
 app.layout = html.Div([
+    dcc.Location(id='url', refresh=False),
     dbc.Container([
         dbc.Row([
             dbc.Col([
@@ -77,19 +78,32 @@ app.layout = html.Div([
     Output("sidebar", "className"),
     Output("sidebar-toggle", "className"),
     Output("sidebar-container", "className"),
-    Output("content", "className", allow_duplicate=True),
+    Output("content", "className"),
     Output("sidebar-state", "data"),
     Input("sidebar-toggle", "n_clicks"),
+    Input("url", "pathname"),
     State("sidebar-state", "data"),
     prevent_initial_call=True
 )
-def toggle_sidebar(n, sidebar_state):
-    if callback_context.triggered_id == "sidebar-toggle":
+def toggle_sidebar(n, pathname, sidebar_state):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+    
+    trigger = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    if trigger == "sidebar-toggle":
         if sidebar_state == "open":
             return "bg-light sidebar-closed", "btn btn-primary sidebar-toggle-closed", "sidebar-container-closed", "content-expanded", "closed"
         else:
             return "bg-light", "btn btn-primary sidebar-toggle", "", "", "open"
-    return dash.no_update
+    elif trigger == "url":
+        if sidebar_state == "closed":
+            return dash.no_update, dash.no_update, dash.no_update, "content-expanded", dash.no_update
+        else:
+            return dash.no_update, dash.no_update, dash.no_update, "", dash.no_update
+    
+    return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
 
 if __name__ == '__main__':

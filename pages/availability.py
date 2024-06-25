@@ -15,12 +15,26 @@ import warnings
 warnings.filterwarnings("ignore", message="Mean of empty slice")
 
 layout = dbc.Container([
-    dbc.Tabs(id='tabs', active_tab='realtime', children=[
-        dbc.Tab(label='Realtime', tab_id='realtime'),
-        dbc.Tab(label='Historical', tab_id='historical'),
-    ], className="nav-fill w-100 mb-3"),
-    html.Div(id='assignment-tabs-content', style={'height': 'calc(100vh - 100px)'})
-], className='p-0', id='content', fluid=True)
+    dbc.Row([
+        dbc.Col([
+            dbc.Tabs(id='availability-tabs', active_tab='realtime', children=[
+                dbc.Tab(label='Realtime', tab_id='realtime'),
+                dbc.Tab(label='Historical', tab_id='historical'),
+            ], className="mb-3 sidebar-adjacent-tabs"),
+            html.Div(id='availability-tabs-content')
+        ], className="p-0")  
+    ], className="g-0")  
+], fluid=True, className="p-0")
+
+@callback(
+    Output('availability-tabs-content', 'children'),
+    Input('availability-tabs', 'active_tab')
+)
+def render_content(tab):
+    if tab == 'realtime':
+        return realtime_layout
+    elif tab == 'historical':
+        return historical_layout
 
 realtime_layout = dbc.Container([
             dbc.Row([
@@ -107,20 +121,11 @@ historical_layout = dbc.Container([
     ], className='g-0 mx-0'),
 ], fluid=True, className='p-0')
 
-@callback(
-    Output('assignment-tabs-content', 'children'),
-    Input('tabs', 'active_tab')
-)
-def render_content(tab):
-    if tab == 'realtime':
-        return realtime_layout
-    else:
-        return historical_layout
 
 @callback(
     Output('hist-block-holes-graph-container', 'children'),
     Output('hist-block-holes-grid-container', 'children'),
-    Input('tabs', 'active_tab'),
+    Input('availability-tabs', 'active_tab'),
     Input('manager-dropdown', 'value'),
     Input('date-picker-range', 'start_date'),
     Input('date-picker-range', 'end_date')
@@ -162,7 +167,7 @@ def update_historical_block_holes_container(tab, selected_manager, start_date, e
 
 @callback(
     Output('realtime-block-holes-container', 'children'),
-    Input('tabs', 'active_tab')
+    Input('availability-tabs', 'active_tab')
 )
 def update_reaaltime(tab):
     if tab == 'realtime':

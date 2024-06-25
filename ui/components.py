@@ -15,24 +15,27 @@ ATOCHA = (-3.690633, 40.406785)
 MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
 MAPBOX_API_KEY = os.getenv("MAPBOX_TOKEN")
 
-def create_map_container(id, initial_view_coords=ATOCHA, tooltip_info={}, map_style=MAP_STYLES[0]):
+def create_map_container(id, initial_view_coords, tooltip_info, map_style):
+    initial_view_state = pdk.ViewState(
+        longitude=initial_view_coords[0],
+        latitude=initial_view_coords[1],
+        zoom=5,
+        pitch=0,
+    )
+
+    deck = pdk.Deck(
+        initial_view_state=initial_view_state,
+        map_style=map_style,
+    )
+
     return dcc.Loading(
         id=f"loading-{id}", 
         children=[
             html.Div(
                 DeckGL(
                     id=id,
-                    data=pdk.Deck(
-                        initial_view_state=pdk.ViewState(
-                            longitude=initial_view_coords[0],
-                            latitude=initial_view_coords[1],
-                            zoom=5,
-                            pitch=0,
-                        ),
-                        layers=[],
-                        map_style=map_style,                            
-                    ).to_json(),
                     mapboxKey=MAPBOX_API_KEY,
+                    data=deck.to_json(),
                     tooltip=tooltip_info
                 ),
                 style={'width': '100%', 'height': '100%'}

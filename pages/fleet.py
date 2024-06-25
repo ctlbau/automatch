@@ -11,8 +11,15 @@ from utils.geo_utils import lic_plate2sher_id_map, get_last_coordinates_by_plate
 import pydeck as pdk
 import pandas as pd
 
-MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
-CHOSEN_STYLE = MAP_STYLES[2]
+MAP_STYLES = [
+    {"label": "Light", "value": "mapbox://styles/mapbox/light-v10"},
+    {"label": "Dark", "value": "mapbox://styles/mapbox/dark-v10"},
+    {"label": "Streets", "value": "mapbox://styles/mapbox/streets-v11"},
+    {"label": "Outdoors", "value": "mapbox://styles/mapbox/outdoors-v11"},
+    {"label": "Satellite", "value": "mapbox://styles/mapbox/satellite-v9"},
+    {"label": "Satellite Streets", "value": "mapbox://styles/mapbox/satellite-streets-v11"},
+]
+DEFAULT_STYLE = MAP_STYLES[5]["value"]  # Dark style as default
 AURO = (-3.587811320499316, 40.39171586339568)
 
 
@@ -23,7 +30,7 @@ layout = dbc.Container([
         dbc.Col([
             dbc.Tabs(
                 id="fleet-tabs",
-                active_tab="vehicle-tab",
+                active_tab="manager-tab",
                 children=[
                     dbc.Tab(label="Manager View", tab_id="manager-tab"),
                     dbc.Tab(label="Vehicle View", tab_id="vehicle-tab"),
@@ -169,35 +176,36 @@ def create_vehicle_layout(min_date, max_date):
                     dbc.CardBody([
                         create_dropdown('plate-dropdown', options=plates_options, label='plate', value='plate', placeholder='Select plate', multi=False, add_all=False),
                         create_date_range_picker('date-picker-range', min_date, max_date, populate_days_from_today=14),
+                        create_dropdown('map-style-dropdown', options=MAP_STYLES, label='label', value='value', placeholder='Select map style', multi=False, add_all=False),
                     ])
                 ], className="mb-3"),
                 html.Div(id='alert-placeholder-vehicle'),
-            ], width=3),
+            ], width=4),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.Div(
+                            create_map_container('last-location-map', initial_view_coords=AURO, tooltip_info={}, map_style=DEFAULT_STYLE),
+                            style={'width': '100%', 'height': '400px', 'position': 'relative'}
+                        )
+                    ])
+                ], className="mb-3", id='last-location-card', style={'display': 'none'}),
+            ], width=8),
+        ]),
+        dbc.Row([
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
                         html.Div(id='vehicle-view-graph-container')
                     ])
                 ], className="mb-3", id='vehicle-view-graph-card', style={'display': 'none'}),
-            ], width=9),
-        ]),
-        dbc.Row([
-            dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.Div(
-                                create_map_container('last-location-map', initial_view_coords=AURO, tooltip_info={}, map_style=CHOSEN_STYLE),
-                                style={'width': '100%', 'height': '400px', 'position': 'relative'}
-                            )
-                        ])
-                    ], className="mb-3", id='last-location-card', style={'display': 'none'}),
             ], width=12)
         ])
     ], fluid=True)
 
 @callback(
     Output('plate-map-store', 'data'),
-    Input('tabs', 'active_tab'),
+    Input('fleet-tabs', 'active_tab'),
     Input('url', 'pathname')
 )
 def update_plate_map_store(tab, pathname):
@@ -231,28 +239,76 @@ def update_vehicle_view(selected_plate, start_date, end_date):
     
     return dcc.Graph(figure=fig), {'display': 'block'}, {'display': 'block'}
 
+from dash.exceptions import PreventUpdate
+
+def create_alert(message, color="warning", icon="fas fa-exclamation-triangle", is_open=True):
+    return dbc.Alert(
+        [
+            html.I(className=f"{icon} me-2"),
+            html.Span(message)
+        ],
+        color=color,
+        dismissable=True,
+        is_open=is_open,
+        fade=True,
+        className="mt-3"
+    )
 
 @callback(
-    Output('last-location-map', 'data'),
     Output('alert-placeholder-vehicle', 'children'),
     Input('plate-dropdown', 'value'),
     State('plate-map-store', 'data')
 )
-def update_map(selected_plate, plate_map):
+def update_alert(selected_plate, plate_map):
     if not selected_plate:
-        return dash.no_update, None
+        raise PreventUpdate
+
+    if plate_map is None:
+        return create_alert(
+            "Failed to fetch plate map data. Please try refreshing the page.",
+            color="danger",
+            icon="fas fa-exclamation-circle"
+        )
+
+    if selected_plate not in plate_map:
+        return create_alert(
+            f"License plate '{selected_plate}' not found in Sherlog's database.",
+            color="warning",
+            icon="fas fa-exclamation-triangle"
+        )
+
+    coords = get_last_coordinates_by_plate(selected_plate, plate_map)
+    if not coords:
+        return create_alert(
+            f"Valid coordinates for vehicle {selected_plate} not found.",
+            color="info",
+            icon="fas fa-info-circle"
+        )
+
+    return None
+
+
+@callback(
+    Output('last-location-map', 'data'),
+    Input('plate-dropdown', 'value'),
+    Input('map-style-dropdown', 'value'),
+    State('plate-map-store', 'data')
+)
+def update_map(selected_plate, selected_map_style, plate_map):
+    if not selected_plate:
+        return dash.no_update
 
     if plate_map is None:
         plate_map = lic_plate2sher_id_map()
         if not plate_map:
-            return dash.no_update, dbc.Alert("Failed to fetch plate map data. Please try refreshing the page.", color="danger", className="col-md-4 offset-md-4 col-12")
+            return dash.no_update
 
     if selected_plate not in plate_map:
-        return dash.no_update, dbc.Alert(f"License plate '{selected_plate}' not found in Sherlog's database.", color="warning", className="col-md-4 offset-md-4 col-12")
+        return dash.no_update
 
     coords = get_last_coordinates_by_plate(selected_plate, plate_map)
     if not coords:
-        return dash.no_update, dbc.Alert(f"Valid coordinates for vehicle {selected_plate} not found.", color="danger", className="col-md-4 offset-md-4 col-12")
+        return dash.no_update
     
     lat, lon = float(coords['lat']), float(coords['lng'])
     address = geodecode_coordinates(lat, lon)
@@ -291,12 +347,13 @@ def update_map(selected_plate, plate_map):
         bearing=0,
     )
 
-    deck_data = pdk.Deck(
+    deck = pdk.Deck(
         layers=[icon_layer],
         initial_view_state=view_state,
-        map_style=CHOSEN_STYLE
-    ).to_json()
-    return deck_data, None
+        map_style=selected_map_style or DEFAULT_STYLE
+    )
+
+    return deck.to_json()
 
 
 @callback(
@@ -484,13 +541,3 @@ def download_csv(n_clicks):
     if n_clicks > 0:
         return True
     return dash.no_update
-
-@callback(
-    Output("content", "className", allow_duplicate=True),
-    Input("sidebar-state", "data"),
-    prevent_initial_call=True
-)
-def adjust_content(sidebar_state):
-    if sidebar_state == "closed":
-        return "mt-3 px-3 content-expanded"
-    return "mt-3 px-3"
