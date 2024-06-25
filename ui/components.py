@@ -222,14 +222,14 @@ def create_date_range_picker(id, min_date, max_date, populate_days_from_today=7)
     )
 
 
-def create_dropdown(id, options, label='name', value='id', placeholder='Select an option', multi=False, add_all=False, class_name=""):
+def create_dropdown(id, options, label='name', value='id', placeholder='Select an option', multi=False, add_all=False, class_name="", default_value=None):
     options = [{'label': option[label], 'value': ','.join(map(str, option[value])) if isinstance(option[value], list) else option[value]} for option in options]
     if add_all:
         options = [{'label': 'All', 'value': 'all'}] + options
     return dcc.Dropdown(
         id=id,
         options=options,
-        value=[] if multi else None,
+        value=default_value if default_value is not None else ([] if multi else None),
         multi=multi,
         clearable=True,
         placeholder=placeholder,

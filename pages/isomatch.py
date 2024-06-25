@@ -18,8 +18,15 @@ dash.register_page(__name__, path='/')
 
 MAPBOX_API_KEY = os.getenv("MAPBOX_TOKEN")
 ATOCHA = (-3.690633, 40.406785)
-MAP_STYLES = ["mapbox://styles/mapbox/light-v9", "mapbox://styles/mapbox/dark-v9", "mapbox://styles/mapbox/satellite-v9"]
-CHOSEN_STYLE = MAP_STYLES[0]
+MAP_STYLES = [
+    {"label": "Light", "value": "mapbox://styles/mapbox/light-v10"},
+    {"label": "Dark", "value": "mapbox://styles/mapbox/dark-v10"},
+    {"label": "Streets", "value": "mapbox://styles/mapbox/streets-v11"},
+    {"label": "Outdoors", "value": "mapbox://styles/mapbox/outdoors-v11"},
+    {"label": "Satellite", "value": "mapbox://styles/mapbox/satellite-v9"},
+    {"label": "Satellite Streets", "value": "mapbox://styles/mapbox/satellite-streets-v11"},
+]
+DEFAULT_STYLE = MAP_STYLES[0]["value"]  # Light style as default
 
 
 layout = dbc.Container([
@@ -68,7 +75,7 @@ iso_layout = dbc.Container([
                     dbc.Row([
                         dbc.Col([
                             dcc.Input(id='street-input', type='text', placeholder='Enter street name and number', required=True, className='form-control mb-2', autoFocus=True),
-                            create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select a province', multi=False, class_name='mb-2'),
+                            create_dropdown('province-dropdown', options=fetch_provinces().to_dict('records'), label='name', value='id', placeholder='Select a province', multi=False, class_name='mb-2', default_value=28),
                             dcc.Input(id='zip-code-input', type='text', placeholder='Enter zip code', name='Zip code', required=False, className='form-control mb-2'),
                             html.Label([
                                 'Isochrone Limits:',
@@ -85,6 +92,7 @@ iso_layout = dbc.Container([
                             create_dropdown('managers-dropdown', options=fetch_managers().to_dict('records'), label='name', value='name', placeholder='Select a manager', multi=True, class_name='mb-3'),
                             create_dropdown('center-dropdown', options=fetch_centers().to_dict('records'), label='name', value='name', placeholder='Select a center', multi=True, class_name='mb-3'),
                             create_dropdown('exchange-locations-dropdown', options=fetch_exchange_locations().to_dict('records'), label='name', value='name', placeholder='Select an exchange location', multi=True, class_name='mb-3'),
+                            create_dropdown('map-style-dropdown', options=MAP_STYLES, label='label', value='value', placeholder='Select map style', multi=False, add_all=False, class_name='mb-3'),
                             dbc.Row([
                                 dbc.Col(html.Label('Filter by Match Status:', className='mr-2'), width='auto'),
                                 dbc.Col(dcc.RadioItems(
@@ -104,7 +112,7 @@ iso_layout = dbc.Container([
                             dbc.Card([
                                 dbc.CardBody(
                                     html.Div(
-                                        create_map_container('isomatch-map', initial_view_coords=ATOCHA, tooltip_info=iso_tooltip, map_style=CHOSEN_STYLE), 
+                                        create_map_container('isomatch-map', initial_view_coords=ATOCHA, tooltip_info=iso_tooltip, map_style=DEFAULT_STYLE), 
                                         style={'height': '500px', 'width': '100%'},
                                         className='map-wrapper'
                                     )
@@ -128,6 +136,138 @@ iso_layout = dbc.Container([
         ], width=12, lg=11, xl=11, className='px-3'),
     ], justify='start', className='mx-0'),
 ], fluid=True, className='mt-3 px-1')
+
+@callback(
+    [
+        Output('isomatch-map', 'data'), 
+        Output('data-tables-container', 'children'),
+        Output('alert-fail-geoencode', 'is_open')
+    ],
+    [
+        Input('submit-val', 'n_clicks'), 
+        State('shifts-dropdown', 'value'), 
+        State('managers-dropdown', 'value'),
+        State('is-matched-radio', 'value'), 
+        State('center-dropdown', 'value'), 
+        State('exchange-locations-dropdown', 'value'),
+        State('street-input', 'value'),
+        State('province-dropdown', 'options'),
+        State('province-dropdown', 'value'),
+        State('zip-code-input', 'value'),
+        State('time-limit-range-slider', 'value'),
+        State('map-style-dropdown', 'value')
+    ],
+)
+def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_matched_filter, selected_center, exchange_locations, street, selected_province, province_id, postal_code, time_limits, map_style):
+    if n_clicks > 0:
+        province = [province for province in selected_province if province['value'] == province_id][0]['label']
+        geoencode_result = geoencode_address(street, province, postal_code)
+
+        if geoencode_result is None:
+            return dash.no_update, dash.no_update, True
+        
+        if geoencode_result:
+            lat, lon = geoencode_result
+            lat, lon = float(lat), float(lon)
+            times = list(range(time_limits[0], time_limits[1] + 1, 5))
+            isochrones_geojson = calculate_isochrones(lat, lon, times)
+            isochrone_coords = extract_coords_from_encompassing_isochrone(isochrones_geojson)
+            computed_view_state = pdk.data_utils.compute_view(isochrone_coords, view_proportion=0.9)
+            drivers_gdf, drivers_list = fetch_drivers([province_id])
+            
+            if selected_shifts:
+                drivers_list = [driver for driver in drivers_list if driver['shift'] in selected_shifts]
+                drivers_gdf = drivers_gdf[drivers_gdf['shift'].isin(selected_shifts)]
+            
+            if selected_managers:
+                drivers_list = [driver for driver in drivers_list if driver['manager'] in selected_managers]
+                drivers_gdf = drivers_gdf[drivers_gdf['manager'].isin(selected_managers)]
+
+            if is_matched_filter != 'all':
+                is_matched_value = True if is_matched_filter == 'true' else False
+                drivers_list = [driver for driver in drivers_list if driver['is_matched'] == is_matched_value]
+                drivers_gdf = drivers_gdf[drivers_gdf['is_matched'] == is_matched_value]
+            
+            if selected_center:
+                drivers_list = [driver for driver in drivers_list if driver['center'] in selected_center]
+                drivers_gdf = drivers_gdf[drivers_gdf['center'].isin(selected_center)]
+            
+            if exchange_locations:
+                drivers_list = [driver for driver in drivers_list if driver['exchange_location'] in exchange_locations]
+                drivers_gdf = drivers_gdf[drivers_gdf['exchange_location'].isin(exchange_locations)]
+
+            icon_data = {
+                "url": "https://upload.wikimedia.org/wikipedia/commons/3/3b/Blackicon.png",
+                "width": 100,
+                "height": 100,
+                # "anchorY": 242,
+            }
+
+            # Create an IconLayer for the geoencoded point
+            icon_layer = pdk.Layer(
+                "IconLayer",
+                data=[{"coordinates": [lon, lat], "icon_data": icon_data}],
+                get_icon="icon_data",
+                get_size=4,
+                size_scale=15,
+                get_position="coordinates",
+                pickable=True,
+            )
+
+            isochrone_layer = pdk.Layer(
+                "GeoJsonLayer",
+                data=isochrones_geojson,
+                opacity=0.1,
+                stroked=False,
+                filled=True,
+                extruded=False,
+                wireframe=True
+            )
+
+            drivers_layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=drivers_list,
+                get_position="coordinates",
+                get_color="color",
+                get_radius="radius",
+                pickable=True,
+                auto_highlight=True,
+            )
+            initial_view_state = computed_view_state
+
+            deck = pdk.Deck(
+                layers=[isochrone_layer, drivers_layer, icon_layer],
+                initial_view_state=initial_view_state,
+                map_style=map_style or DEFAULT_STYLE
+                ).to_json()
+
+            partitioned_drivers = partition_drivers_by_isochrones(drivers_gdf, isochrones_geojson)
+            # assert check_partitions_intersection(partitioned_drivers), "Partitions are not disjoint!"
+            
+            data_tables = []
+            num_partitions = len(partitioned_drivers)
+            for i, partition in enumerate(partitioned_drivers):
+                partition = partition.drop(columns=['driver_id', 'matched_driver_id', 'geometry', 'lat', 'lng'])
+                current_date = datetime.now().strftime("%Y-%m-%d")
+                csv_filename = f"drivers_within_{time_limits[0] + i * 5}_min_isochrone_centered_on_{street}_{province}_at_{current_date}.csv"
+                table = create_data_table({'type': 'drivers-table', 'index': i}, partition, csv_filename, page_size=10)
+                download_button = html.Button('Download CSV', id={'type': 'download-csv', 'index': i}, n_clicks=0)
+                if i < num_partitions - 1:
+                    number_of_drivers = len(partition)
+                    iso_title = time_limits[0] + i * 5 
+                    title = f'{number_of_drivers} drivers within {iso_title} minutes of chosen location'
+                else:
+                    # This is the last partition, so we give it a custom title
+                    number_of_drivers = len(partition)
+                    title = f'{number_of_drivers} drivers outside largest isochrone'
+                data_tables.append(html.Div(children=[html.H3(title), table, download_button], style={'margin': '20px'}))
+
+            return deck, data_tables, False
+        else:
+            # No clicks yet, do not update anything and ensure the alert is closed
+            return dash.no_update, dash.no_update, False
+    return dash.no_update, dash.no_update, False
+
 
 stats_layout = dbc.Container([
     dbc.Row([
@@ -291,137 +431,6 @@ def update_error_modal(n_clicks, error_data):
             return True, error_table
     return False, []
 
-@callback(
-    [
-        Output('isomatch-map', 'data'), 
-        Output('data-tables-container', 'children'),
-        Output('alert-fail-geoencode', 'is_open')
-        ],
-    [
-        Input('submit-val', 'n_clicks'), 
-        Input('shifts-dropdown', 'value'), 
-        Input('managers-dropdown', 'value'),
-        Input('is-matched-radio', 'value'), 
-        Input('center-dropdown', 'value'), 
-        Input('exchange-locations-dropdown', 'value')
-        ],
-    [
-        State('street-input', 'value'),
-        State('province-dropdown', 'options'),
-        State('province-dropdown', 'value'),
-        State('zip-code-input', 'value'),
-        State('time-limit-range-slider', 'value')
-        ]
-)
-def update_map_and_tables(n_clicks, selected_shifts, selected_managers, is_matched_filter, selected_center, exchange_locations, street, selected_province, province_id, postal_code, time_limits):
-    if n_clicks > 0:
-        province = [province for province in selected_province if province['value'] == province_id][0]['label']
-        geoencode_result = geoencode_address(street, province, postal_code)
-
-        if geoencode_result is None:
-            return dash.no_update, dash.no_update, True
-        
-        if geoencode_result:
-            lat, lon = geoencode_result
-            lat, lon = float(lat), float(lon)
-            times = list(range(time_limits[0], time_limits[1] + 1, 5))
-            isochrones_geojson = calculate_isochrones(lat, lon, times)
-            isochrone_coords = extract_coords_from_encompassing_isochrone(isochrones_geojson)
-            computed_view_state = pdk.data_utils.compute_view(isochrone_coords, view_proportion=0.9)
-            drivers_gdf, drivers_list = fetch_drivers([province_id])
-            
-            if selected_shifts:
-                drivers_list = [driver for driver in drivers_list if driver['shift'] in selected_shifts]
-                drivers_gdf = drivers_gdf[drivers_gdf['shift'].isin(selected_shifts)]
-            
-            if selected_managers:
-                drivers_list = [driver for driver in drivers_list if driver['manager'] in selected_managers]
-                drivers_gdf = drivers_gdf[drivers_gdf['manager'].isin(selected_managers)]
-
-            if is_matched_filter != 'all':
-                is_matched_value = True if is_matched_filter == 'true' else False
-                drivers_list = [driver for driver in drivers_list if driver['is_matched'] == is_matched_value]
-                drivers_gdf = drivers_gdf[drivers_gdf['is_matched'] == is_matched_value]
-            
-            if selected_center:
-                drivers_list = [driver for driver in drivers_list if driver['center'] in selected_center]
-                drivers_gdf = drivers_gdf[drivers_gdf['center'].isin(selected_center)]
-            
-            if exchange_locations:
-                drivers_list = [driver for driver in drivers_list if driver['exchange_location'] in exchange_locations]
-                drivers_gdf = drivers_gdf[drivers_gdf['exchange_location'].isin(exchange_locations)]
-
-            icon_data = {
-                "url": "https://upload.wikimedia.org/wikipedia/commons/3/3b/Blackicon.png",
-                "width": 100,
-                "height": 100,
-                # "anchorY": 242,
-            }
-
-            # Create an IconLayer for the geoencoded point
-            icon_layer = pdk.Layer(
-                "IconLayer",
-                data=[{"coordinates": [lon, lat], "icon_data": icon_data}],
-                get_icon="icon_data",
-                get_size=4,
-                size_scale=15,
-                get_position="coordinates",
-                pickable=True,
-            )
-
-            isochrone_layer = pdk.Layer(
-                "GeoJsonLayer",
-                data=isochrones_geojson,
-                opacity=0.1,
-                stroked=False,
-                filled=True,
-                extruded=False,
-                wireframe=True
-            )
-
-            drivers_layer = pdk.Layer(
-                "ScatterplotLayer",
-                data=drivers_list,
-                get_position="coordinates",
-                get_color="color",
-                get_radius="radius",
-                pickable=True,
-                auto_highlight=True,
-            )
-            initial_view_state = computed_view_state
-
-            new_deck_data = pdk.Deck(
-                layers=[isochrone_layer, drivers_layer, icon_layer],
-                initial_view_state=initial_view_state,
-                map_style=CHOSEN_STYLE
-            ).to_json()
-
-            partitioned_drivers = partition_drivers_by_isochrones(drivers_gdf, isochrones_geojson)
-            # assert check_partitions_intersection(partitioned_drivers), "Partitions are not disjoint!"
-            
-            data_tables = []
-            num_partitions = len(partitioned_drivers)
-            for i, partition in enumerate(partitioned_drivers):
-                partition = partition.drop(columns=['driver_id', 'matched_driver_id', 'geometry', 'lat', 'lng'])
-                current_date = datetime.now().strftime("%Y-%m-%d")
-                csv_filename = f"drivers_within_{time_limits[0] + i * 5}_min_isochrone_centered_on_{street}_{province}_at_{current_date}.csv"
-                table = create_data_table({'type': 'drivers-table', 'index': i}, partition, csv_filename, page_size=10)
-                download_button = html.Button('Download CSV', id={'type': 'download-csv', 'index': i}, n_clicks=0)
-                if i < num_partitions - 1:
-                    number_of_drivers = len(partition)
-                    iso_title = time_limits[0] + i * 5 
-                    title = f'{number_of_drivers} drivers within {iso_title} minutes of chosen location'
-                else:
-                    # This is the last partition, so we give it a custom title
-                    number_of_drivers = len(partition)
-                    title = f'{number_of_drivers} drivers outside largest isochrone'
-                data_tables.append(html.Div(children=[html.H3(title), table, download_button], style={'margin': '20px'}))
-
-            return new_deck_data, data_tables, False
-        else:
-            # No clicks yet, do not update anything and ensure the alert is closed
-            return dash.no_update, dash.no_update, False
-    return dash.no_update, dash.no_update, False
 
 @callback(
     Output({'type': 'drivers-table', 'index': MATCH}, 'exportDataAsCsv'),
@@ -432,12 +441,3 @@ def download_csv(n_clicks):
     if n_clicks > 0:
         return True
     return dash.no_update
-
-@callback(
-    Output('isomatch-map', 'style'),
-    Input('tabs', 'active_tab')
-)
-def resize_map(active_tab):
-    if active_tab == 'iso-tab':
-        return {'width': '100%', 'height': '100%'}
-    return {'width': '100%', 'height': '0'}  # Hide map on other tabs
