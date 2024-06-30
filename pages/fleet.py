@@ -19,7 +19,7 @@ MAP_STYLES = [
     {"label": "Satellite", "value": "mapbox://styles/mapbox/satellite-v9"},
     {"label": "Satellite Streets", "value": "mapbox://styles/mapbox/satellite-streets-v11"},
 ]
-DEFAULT_STYLE = MAP_STYLES[5]["value"]  # Dark style as default
+DEFAULT_STYLE = MAP_STYLES[5]["value"]
 AURO = (-3.587811320499316, 40.39171586339568)
 
 

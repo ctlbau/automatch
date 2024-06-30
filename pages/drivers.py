@@ -19,9 +19,9 @@ layout = dbc.Container([
                 dbc.Tab(label='Exchange Locations', tab_id='exchange-locations')
             ], className="mb-3 sidebar-adjacent-tabs"),
             html.Div(id='driver-tabs-content')
-        ], className="p-0")  # Remove padding from the column
-    ], className="g-0")  # Remove gutters from the row
-], fluid=True, className="p-0")  # Make the container fluid and remove its padding
+        ], className="p-0")  
+    ], className="g-0")  
+], fluid=True, className="p-0")
 
 min_date, max_date = get_min_max_dates_from_schedule_events()
 manager_options = fetch_managers().to_dict('records')

@@ -45,133 +45,133 @@ def create_map_container(id, initial_view_coords, tooltip_info, map_style):
     )
 
 
-def create_navbar(title):
-    return html.Nav(
-        className="navbar navbar-expand-lg navbar-dark bg-dark mb-2",
-        children=[
-            html.Div(
-                className="container-fluid d-flex justify-content-center",
-                children=[
-                    html.Span(html.Strong(title), className="navbar-brand text-center")
-                ]
-            )
-        ]
-    )
+# def create_navbar(title):
+#     return html.Nav(
+#         className="navbar navbar-expand-lg navbar-dark bg-dark mb-2",
+#         children=[
+#             html.Div(
+#                 className="container-fluid d-flex justify-content-center",
+#                 children=[
+#                     html.Span(html.Strong(title), className="navbar-brand text-center")
+#                 ]
+#             )
+#         ]
+#     )
 
-def create_company_filter(id):
-    return html.Nav(
-        className="navbar navbar-expand-lg mb-2",
-        children=[
-            html.Div(
-                className="container-fluid",
-                children=[
-                    html.Div(
-                        dcc.Dropdown(
-                            id=id,
-                            options=[
-                                {'label': 'Auro', 'value': 'auro'},
-                                {'label': 'Cibeles', 'value': 'cibeles'},
-                                {'label': 'Gestionados', 'value': 'gestionados'},
-                                {'label': 'All', 'value': 'all'}
-                            ],
-                            value='all',
-                            clearable=False,
-                            placeholder="Select company"
-                        ), className="col-md-4 offset-md-4 col-12"
-                    )
-                ]
-            )
-        ]
-    )
-
-
-def exchange_locations_dropdown(id, placeholder, multi=False):
-    return html.Nav(
-        className="navbar navbar-expand-lg mb-2",
-        children=[
-            html.Div(
-                className="container-fluid",
-                children=[
-                    html.Div(
-                        dcc.Dropdown(
-                            id=id,
-                            options=[],
-                            value=[],
-                            multi=multi,
-                            clearable=True,
-                            placeholder=placeholder,
-                        ), className="col-md-4 offset-md-4 col-12",
-                    )
-                ]
-            )
-        ]
-    )
-
-def create_status_filter(id):
-    return html.Nav(
-        className="navbar navbar-expand-lg mb-2",
-        children=[
-            html.Div(
-                className="container-fluid",
-                children=[
-                    html.Div(
-                        dcc.Dropdown(
-                            id=id,
-                            options=[],  # Populated dynamically
-                            value=[],
-                            multi=True,
-                            clearable=True,
-                            placeholder="Select statuses"
-                        ), className="col-md-4 offset-md-4 col-12"
-                    )
-                ]
-            )
-        ]
-    )
-
-def create_plate_filter(id):
-    return html.Nav(
-        className="navbar navbar-expand-lg mb-2",
-        children=[
-            html.Div(
-                className="container-fluid",
-                children=[
-                    html.Div(
-                        dcc.Dropdown(
-                            id=id,
-                            options=[],  # Populated dynamically
-                            value='',
-                            multi=False,
-                            clearable=True,
-                            placeholder="Select plates"
-                        ), className="col-md-4 offset-md-4 col-12"
-                    )
-                ]
-            )
-        ]
-    )
+# def create_company_filter(id):
+#     return html.Nav(
+#         className="navbar navbar-expand-lg mb-2",
+#         children=[
+#             html.Div(
+#                 className="container-fluid",
+#                 children=[
+#                     html.Div(
+#                         dcc.Dropdown(
+#                             id=id,
+#                             options=[
+#                                 {'label': 'Auro', 'value': 'auro'},
+#                                 {'label': 'Cibeles', 'value': 'cibeles'},
+#                                 {'label': 'Gestionados', 'value': 'gestionados'},
+#                                 {'label': 'All', 'value': 'all'}
+#                             ],
+#                             value='all',
+#                             clearable=False,
+#                             placeholder="Select company"
+#                         ), className="col-md-4 offset-md-4 col-12"
+#                     )
+#                 ]
+#             )
+#         ]
+#     )
 
 
-manager_filter = html.Nav(
-    className="navbar navbar-expand-lg mb-2",
-    children=[
-        html.Div(
-            className="container-fluid",
-            children=[
-                html.Div(
-                    dcc.Dropdown(
-                        id='manager-dropdown',
-                        options=[],  # Populated dynamically
-                        value=[],
-                        multi=False,
-                        clearable=True,
-                        placeholder="Select managers"
-                    ), className="col-md-4 offset-md-4 col-12"
-                )
-            ]
-        )
-    ]
-)
+# def exchange_locations_dropdown(id, placeholder, multi=False):
+#     return html.Nav(
+#         className="navbar navbar-expand-lg mb-2",
+#         children=[
+#             html.Div(
+#                 className="container-fluid",
+#                 children=[
+#                     html.Div(
+#                         dcc.Dropdown(
+#                             id=id,
+#                             options=[],
+#                             value=[],
+#                             multi=multi,
+#                             clearable=True,
+#                             placeholder=placeholder,
+#                         ), className="col-md-4 offset-md-4 col-12",
+#                     )
+#                 ]
+#             )
+#         ]
+#     )
+
+# def create_status_filter(id):
+#     return html.Nav(
+#         className="navbar navbar-expand-lg mb-2",
+#         children=[
+#             html.Div(
+#                 className="container-fluid",
+#                 children=[
+#                     html.Div(
+#                         dcc.Dropdown(
+#                             id=id,
+#                             options=[],  # Populated dynamically
+#                             value=[],
+#                             multi=True,
+#                             clearable=True,
+#                             placeholder="Select statuses"
+#                         ), className="col-md-4 offset-md-4 col-12"
+#                     )
+#                 ]
+#             )
+#         ]
+#     )
+
+# def create_plate_filter(id):
+#     return html.Nav(
+#         className="navbar navbar-expand-lg mb-2",
+#         children=[
+#             html.Div(
+#                 className="container-fluid",
+#                 children=[
+#                     html.Div(
+#                         dcc.Dropdown(
+#                             id=id,
+#                             options=[],  # Populated dynamically
+#                             value='',
+#                             multi=False,
+#                             clearable=True,
+#                             placeholder="Select plates"
+#                         ), className="col-md-4 offset-md-4 col-12"
+#                     )
+#                 ]
+#             )
+#         ]
+#     )
+
+
+# manager_filter = html.Nav(
+#     className="navbar navbar-expand-lg mb-2",
+#     children=[
+#         html.Div(
+#             className="container-fluid",
+#             children=[
+#                 html.Div(
+#                     dcc.Dropdown(
+#                         id='manager-dropdown',
+#                         options=[],  # Populated dynamically
+#                         value=[],
+#                         multi=False,
+#                         clearable=True,
+#                         placeholder="Select managers"
+#                     ), className="col-md-4 offset-md-4 col-12"
+#                 )
+#             ]
+#         )
+#     ]
+# )
 
 
 def create_navbar_options(count_or_proportion_id):
